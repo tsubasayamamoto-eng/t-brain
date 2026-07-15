@@ -640,6 +640,48 @@
   @keyframes cartRankBlink{0%,100%{opacity:1}50%{opacity:.62}}
   @media (prefers-reduced-motion:reduce){.cart-mine-badge,.cart-mine-badge::after,.cart-badge.is-mine,.cart-rank-badge{animation:none}}
 
+  /* ===== メーカー問屋管理帳 ===== */
+  .sup-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .sup-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 16px}
+  .sup-filters{display:flex;gap:6px}
+  .sup-filter-btn{padding:6px 14px;border:1px solid #e5c4d6;background:#fff;border-radius:999px;font-size:12px;font-weight:800;color:#9d5b7f;cursor:pointer;transition:all .12s}
+  .sup-filter-btn:hover{background:#fdf2f8}
+  .sup-filter-btn.active{background:linear-gradient(135deg,#f472b6,#ec4899);color:#fff;border-color:transparent}
+  .sup-search{flex:1;min-width:200px;padding:8px 12px;border:1px solid #e5c4d6;border-radius:10px;font-size:13px}
+  .sup-count{font-size:12px;font-weight:800;color:#9ca3af;white-space:nowrap}
+  .sup-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  .sup-empty{grid-column:1/-1;text-align:center;padding:40px 20px;color:#b08aa0;font-weight:700}
+  .sup-card{border:1px solid #f3d5e5;border-radius:16px;background:#fff;box-shadow:0 3px 10px rgba(244,114,182,.10);overflow:hidden;display:flex;flex-direction:column}
+  .sup-card.sup-maker{border-top:4px solid #fb923c}
+  .sup-card.sup-whole{border-top:4px solid #a78bfa}
+  .sup-head{display:flex;align-items:center;gap:8px;padding:12px 14px 8px;flex-wrap:wrap}
+  .sup-type-badge{font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;white-space:nowrap}
+  .sup-type-badge.sup-maker{background:#fff4e6;color:#b45309;border:1px solid #fed7aa}
+  .sup-type-badge.sup-whole{background:#f3e8ff;color:#6b21a8;border:1px solid #ddd6fe}
+  .sup-name{font-size:16px;font-weight:900;color:#3d2d3d;flex:1;min-width:0;word-break:break-word}
+  .sup-actions{margin-left:auto}
+  .sup-body{padding:2px 14px 10px;display:flex;flex-direction:column;gap:4px}
+  .sup-row{display:flex;gap:7px;font-size:12.5px;color:#4b3a47;align-items:flex-start}
+  .sup-row .sup-ic{flex-shrink:0;width:16px;text-align:center}
+  .sup-row a{color:#2563eb;text-decoration:none;word-break:break-all}
+  .sup-row a:hover{text-decoration:underline}
+  .sup-memo{margin-top:4px;font-size:12px;color:#6b5563;background:#fdf6fb;border-radius:8px;padding:6px 9px;white-space:pre-wrap;word-break:break-word}
+  .sup-files{margin-top:auto;padding:10px 14px 14px;border-top:1px dashed #f3d5e5;background:#fffafd}
+  .sup-files-head{font-size:11px;font-weight:800;color:#9d5b7f;margin-bottom:6px}
+  .sup-drop{border:2px dashed #e5c4d6;border-radius:10px;padding:10px;text-align:center;font-size:11px;color:#b08aa0;background:#fff;transition:all .12s}
+  .sup-drop.dragover{border-color:#ec4899;background:#fdf2f8;color:#be185d}
+  .sup-pick{color:#2563eb;font-weight:800;cursor:pointer;text-decoration:underline}
+  .sup-file-list{margin-top:8px;display:flex;flex-direction:column;gap:5px}
+  .sup-nofile{font-size:11px;color:#cbb0c0;text-align:center;padding:4px}
+  .sup-file{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #f0dbe8;border-radius:8px;padding:5px 8px}
+  .sup-file-ic{flex-shrink:0}
+  .sup-file-name{flex:1;min-width:0;font-size:12px;font-weight:700;color:#3d2d3d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sup-file-size{font-size:10px;color:#9ca3af;white-space:nowrap}
+  .sup-file-btn{border:1px solid #e5c4d6;background:#fff;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:800;color:#9d5b7f;cursor:pointer;white-space:nowrap}
+  .sup-file-btn:hover{background:#fdf2f8}
+  .sup-file-btn.del:hover{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+  #tab-suppliers textarea{width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical}
+
   /* ===== 在庫列 ===== */
   table.main-table thead th.col-stock{background:#ecfeff;width:118px;border-left:2px solid #a5f3fc;border-right:2px solid #a5f3fc;color:#0e7490}
   table.main-table tbody td.col-stock{border-left:2px solid #cffafe;border-right:2px solid #cffafe;background:#f7feff}
@@ -919,6 +961,7 @@
   <button class="tab-btn" data-tab="settings">⚙️ 手数料・基本設定</button>
   <button class="tab-btn" data-tab="calc">💰 利益計算</button>
   <button class="tab-btn" data-tab="calculator">🧮 電卓</button>
+  <button class="tab-btn" data-tab="suppliers">🏭 メーカー問屋管理帳</button>
   <button class="tab-btn" data-tab="data">💾 データ管理</button>
 </nav>
 
@@ -1277,7 +1320,69 @@
 
     </div>
   </section>
+
+  <!-- ===== メーカー問屋管理帳タブ ===== -->
+  <section id="tab-suppliers" class="tab-content" style="display:none">
+    <div class="panel">
+      <div class="sup-toolbar">
+        <h2 style="margin:0">🏭 メーカー問屋管理帳</h2>
+        <button type="button" class="btn" style="background:#16a34a;color:#fff;font-weight:800;padding:10px 20px" onclick="openSupplierModal()">＋ 取引先を追加</button>
+      </div>
+      <p class="help">取引しているメーカー・問屋の情報を保存できます。<b>取引先情報は全PC・スマホで共有</b>されます。見積などのファイルは各カードに<b>この端末へ保存</b>できます（その端末でだけ開けます）。</p>
+      <div class="sup-controls">
+        <div class="sup-filters">
+          <button class="sup-filter-btn active" data-sft="all" onclick="supSetFilter('all')">すべて</button>
+          <button class="sup-filter-btn" data-sft="maker" onclick="supSetFilter('maker')">🏭 メーカー</button>
+          <button class="sup-filter-btn" data-sft="wholesaler" onclick="supSetFilter('wholesaler')">🏢 問屋・卸</button>
+        </div>
+        <input type="text" class="sup-search" placeholder="🔍 会社名・担当・電話・メモで検索" oninput="supSearch(this.value)">
+        <span class="sup-count" id="supCount">0 件</span>
+      </div>
+      <div id="supplierList" class="sup-list"></div>
+    </div>
+  </section>
 </main>
+
+<!-- ===== 取引先 追加/編集モーダル ===== -->
+<div class="modal-back" id="supplierModal">
+  <div class="modal" style="max-width:640px">
+    <header>
+      <h2><span class="modal-char"><span class="kawaii"><svg width="30" height="30"><use href="#char-bunny"/></svg></span></span><span id="supModalTitle">取引先を追加</span></h2>
+      <button type="button" class="btn light sm" onclick="closeSupplierModal()">✕ 閉じる</button>
+    </header>
+    <div class="body">
+      <fieldset>
+        <legend>取引先情報</legend>
+        <div class="grid" style="grid-template-columns:150px 1fr">
+          <div>
+            <label class="field">種別</label>
+            <select id="sup_type"><option value="maker">🏭 メーカー</option><option value="wholesaler">🏢 問屋・卸</option></select>
+          </div>
+          <div>
+            <label class="field">会社名 *</label>
+            <input type="text" id="sup_name" placeholder="例: 株式会社〇〇">
+          </div>
+        </div>
+        <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:10px">
+          <div><label class="field">担当者</label><input type="text" id="sup_contact" placeholder="例: 山田様"></div>
+          <div><label class="field">電話</label><input type="text" id="sup_phone" placeholder="例: 052-000-0000"></div>
+          <div><label class="field">メール</label><input type="text" id="sup_email" placeholder="例: info@example.com"></div>
+          <div><label class="field">掛率・取引条件</label><input type="text" id="sup_terms" placeholder="例: 掛率70% / ロット10個〜"></div>
+        </div>
+        <div style="margin-top:10px"><label class="field">住所</label><input type="text" id="sup_address" placeholder="例: 愛知県〇〇市…"></div>
+        <div style="margin-top:10px"><label class="field">関連する商品コード・JAN（任意・カンマ区切り）</label><input type="text" id="sup_codes" placeholder="例: 0444, 4901234567890"></div>
+        <div style="margin-top:10px"><label class="field">メモ</label><textarea id="sup_memo" rows="3" placeholder="取引の経緯・条件・注意点など"></textarea></div>
+      </fieldset>
+    </div>
+    <footer style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px;border-top:1px solid #fce7f3;gap:8px">
+      <button type="button" class="btn light sm" id="supDeleteBtn" style="background:#fee2e2;color:#991b1b;display:none" onclick="deleteSupplier()">🗑 削除</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button type="button" class="btn secondary" onclick="closeSupplierModal()">キャンセル</button>
+        <button type="button" class="btn" style="background:#16a34a;color:#fff;font-weight:800" onclick="saveSupplier()">💾 保存</button>
+      </div>
+    </footer>
+  </div>
+</div>
 
 <!-- ===== クロスモール在庫取込モーダル ===== -->
 <div class="modal-back" id="cmStockModal">
@@ -1719,6 +1824,7 @@ function loadStateLocal(){
       if(!s.fees) s.fees = {...DEFAULT_FEES};
       if(s.fees.rakuten===13) s.fees.rakuten = 10;
       if(!s.products) s.products = [];
+      if(!Array.isArray(s.suppliers)) s.suppliers = [];
       s.products = migrateProducts(s.products);
       return s;
     }
@@ -1944,7 +2050,7 @@ async function runDiagnostic(){
   const testPayload = JSON.stringify({
     action:'save', pw:_sessionPw,
     products: productsStr,
-    fees: JSON.stringify(state.fees),
+    fees: feesPayload(),
     saveToken: testToken
   });
   log('');
@@ -2037,7 +2143,7 @@ async function manualSave(){
 
   try{
     const productsStr = JSON.stringify(state.products);
-    const feesStr = JSON.stringify(state.fees);
+    const feesStr = feesPayload();
     const token = _genSaveToken();
 
     const payload = JSON.stringify({
@@ -2101,8 +2207,16 @@ async function loadStateOnline(){
   if(!Array.isArray(products)) products = [];
   products = migrateProducts(products);
   let fees = {...DEFAULT_FEES};
-  try{ const f = JSON.parse(r.fees); if(f) fees = {...DEFAULT_FEES,...f}; }catch(e){}
-  return {products, fees};
+  let suppliers = [];
+  try{
+    const f = JSON.parse(r.fees);
+    if(f){
+      if(Array.isArray(f.__suppliers)) suppliers = f.__suppliers;
+      delete f.__suppliers;
+      fees = {...DEFAULT_FEES,...f};
+    }
+  }catch(e){}
+  return {products, fees, suppliers};
 }
 
 let _saveTimer = null;
@@ -2136,7 +2250,7 @@ async function _doSaveNow(){
     const r = await apiSave({
       action:'save',
       products: productsStr,
-      fees: JSON.stringify(state.fees)
+      fees: feesPayload()
     });
     console.log('[SAVE] 成功:', r.method);
     _saveDirty = false;
@@ -2182,7 +2296,7 @@ window.addEventListener('beforeunload', ()=>{
       const blob = new Blob([JSON.stringify({
         action:'save', pw:_sessionPw,
         products: JSON.stringify(state.products),
-        fees: JSON.stringify(state.fees),
+        fees: feesPayload(),
         saveToken: token
       })], {type:'text/plain;charset=utf-8'});
       navigator.sendBeacon(GAS_URL, blob);
@@ -2360,6 +2474,7 @@ function switchTab(tab){
   document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');
   document.getElementById('tab-'+tab).style.display='block';
   if(tab==='settings') renderSettings();
+  if(tab==='suppliers') renderSuppliers();
   if(tab==='calc' && window.ProfitCalc) window.ProfitCalc.init();
   if(tab==='calculator' && window.Calc10) window.Calc10.init();
 }
@@ -2405,6 +2520,164 @@ function updateFee(mall,val){
   saveState();
   renderProducts();
 }
+
+/* ===== メーカー問屋管理帳 ===== */
+const SUP_TYPES = {maker:{label:'メーカー',icon:'🏭',cls:'sup-maker'}, wholesaler:{label:'問屋・卸',icon:'🏢',cls:'sup-whole'}};
+let editingSupplierId = null;
+let _supFilter = {type:'all', q:''};
+function ensureSuppliers(){ if(!Array.isArray(state.suppliers)) state.suppliers=[]; return state.suppliers; }
+// 取引先(テキスト情報)を fees ブロックに相乗りさせてGAS同期する（バックエンド無改修）。ファイル本体は同期しない(端末ローカル)
+function feesPayload(){ ensureSuppliers(); return JSON.stringify({...state.fees, __suppliers: state.suppliers}); }
+
+function renderSuppliers(){
+  ensureSuppliers();
+  const wrap = document.getElementById('supplierList'); if(!wrap) return;
+  let list = state.suppliers.slice();
+  if(_supFilter.type!=='all') list = list.filter(s=>s.type===_supFilter.type);
+  const q = _supFilter.q.trim().toLowerCase();
+  if(q) list = list.filter(s=> [s.name,s.contact,s.phone,s.email,s.address,s.memo,s.codes,s.terms].map(x=>String(x||'').toLowerCase()).some(v=>v.includes(q)));
+  list.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''),'ja'));
+  const cnt=document.getElementById('supCount'); if(cnt) cnt.textContent = `${list.length} / ${state.suppliers.length} 件`;
+  if(!list.length){ wrap.innerHTML = `<div class="sup-empty">${state.suppliers.length?'該当する取引先がありません':'まだ取引先がありません。「＋ 取引先を追加」から登録してください。'}</div>`; return; }
+  wrap.innerHTML = list.map(renderSupplierCard).join('');
+  list.forEach(s=> loadSupplierFiles(s.id));
+}
+function renderSupplierCard(s){
+  const t = SUP_TYPES[s.type]||SUP_TYPES.maker;
+  const row = (icon,val,href)=> val ? `<div class="sup-row"><span class="sup-ic">${icon}</span>${href?`<a href="${href}" target="_blank" rel="noopener">${esc(val)}</a>`:`<span>${esc(val)}</span>`}</div>` : '';
+  const tel = s.phone?('tel:'+String(s.phone).replace(/[^0-9+]/g,'')):'';
+  return `<div class="sup-card ${t.cls}" data-sid="${s.id}">
+    <div class="sup-head">
+      <span class="sup-type-badge ${t.cls}">${t.icon} ${t.label}</span>
+      <span class="sup-name">${esc(s.name||'（無名）')}</span>
+      <div class="sup-actions"><button class="btn light sm" onclick="openSupplierModal('${s.id}')">✏️ 編集</button></div>
+    </div>
+    <div class="sup-body">
+      ${row('👤', s.contact)}
+      ${row('📞', s.phone, tel)}
+      ${row('✉️', s.email, s.email?('mailto:'+s.email):'')}
+      ${row('📍', s.address)}
+      ${row('💹', s.terms)}
+      ${row('🔖', s.codes)}
+      ${s.memo?`<div class="sup-memo">📝 ${esc(s.memo)}</div>`:''}
+    </div>
+    <div class="sup-files">
+      <div class="sup-files-head">📎 見積・資料（この端末に保存）</div>
+      <div class="sup-drop" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="supDrop(event,'${s.id}')">
+        ここに見積(PDF/Excel)をドラッグ、または <label class="sup-pick">ファイルを選ぶ<input type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.heic,.doc,.docx" style="display:none" onchange="supPick(this,'${s.id}')"></label>
+      </div>
+      <div class="sup-file-list" id="supFiles_${s.id}"><div class="sup-nofile">読み込み中…</div></div>
+    </div>
+  </div>`;
+}
+function supSetFilter(type){ _supFilter.type=type; document.querySelectorAll('.sup-filter-btn').forEach(b=>b.classList.toggle('active', b.dataset.sft===type)); renderSuppliers(); }
+function supSearch(v){ _supFilter.q=v; renderSuppliers(); }
+
+function openSupplierModal(id){
+  ensureSuppliers();
+  editingSupplierId = id||null;
+  const s = id? state.suppliers.find(x=>x.id===id):null;
+  document.getElementById('supModalTitle').textContent = s?'取引先を編集':'取引先を追加';
+  document.getElementById('sup_type').value = s?.type||'maker';
+  document.getElementById('sup_name').value = s?.name||'';
+  document.getElementById('sup_contact').value = s?.contact||'';
+  document.getElementById('sup_phone').value = s?.phone||'';
+  document.getElementById('sup_email').value = s?.email||'';
+  document.getElementById('sup_address').value = s?.address||'';
+  document.getElementById('sup_terms').value = s?.terms||'';
+  document.getElementById('sup_codes').value = s?.codes||'';
+  document.getElementById('sup_memo').value = s?.memo||'';
+  document.getElementById('supDeleteBtn').style.display = s?'inline-block':'none';
+  document.getElementById('supplierModal').classList.add('show');
+}
+function closeSupplierModal(){ document.getElementById('supplierModal').classList.remove('show'); }
+function saveSupplier(){
+  const name=document.getElementById('sup_name').value.trim();
+  if(!name){ toast('会社名を入力してください','error'); document.getElementById('sup_name').focus(); return; }
+  ensureSuppliers();
+  const data={
+    id: editingSupplierId||('s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
+    type: document.getElementById('sup_type').value,
+    name,
+    contact:document.getElementById('sup_contact').value.trim(),
+    phone:document.getElementById('sup_phone').value.trim(),
+    email:document.getElementById('sup_email').value.trim(),
+    address:document.getElementById('sup_address').value.trim(),
+    terms:document.getElementById('sup_terms').value.trim(),
+    codes:document.getElementById('sup_codes').value.trim(),
+    memo:document.getElementById('sup_memo').value.trim(),
+    updatedAt:new Date().toISOString()
+  };
+  const i = editingSupplierId ? state.suppliers.findIndex(x=>x.id===editingSupplierId) : -1;
+  if(i>=0) state.suppliers[i]=data; else state.suppliers.push(data);
+  saveState();
+  closeSupplierModal();
+  renderSuppliers();
+  toast('取引先を保存しました','success');
+}
+function deleteSupplier(){
+  if(!editingSupplierId) return;
+  const s=state.suppliers.find(x=>x.id===editingSupplierId);
+  if(!confirm(`「${s?.name||''}」を削除しますか？\n（この端末に保存した見積ファイルも一緒に消えます）`)) return;
+  const sid=editingSupplierId;
+  idbFilesBySupplier(sid).then(fs=>fs.forEach(f=>idbDeleteFile(f.id))).catch(()=>{});
+  state.suppliers = state.suppliers.filter(x=>x.id!==sid);
+  saveState();
+  closeSupplierModal();
+  renderSuppliers();
+  toast('削除しました','');
+}
+
+/* ---- 見積ファイル（この端末のみ・IndexedDB） ---- */
+let _idbP=null;
+function idb(){
+  if(_idbP) return _idbP;
+  _idbP = new Promise((res,rej)=>{
+    const req = indexedDB.open('tbrain_files',1);
+    req.onupgradeneeded = e=>{ const db=e.target.result; if(!db.objectStoreNames.contains('files')){ const os=db.createObjectStore('files',{keyPath:'id'}); os.createIndex('supplierId','supplierId',{unique:false}); } };
+    req.onsuccess = e=>res(e.target.result);
+    req.onerror = ()=>rej(req.error);
+  });
+  return _idbP;
+}
+async function idbAddFile(rec){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction('files','readwrite'); tx.objectStore('files').put(rec); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
+async function idbFilesBySupplier(sid){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction('files','readonly'); const req=tx.objectStore('files').index('supplierId').getAll(sid); req.onsuccess=()=>res(req.result||[]); req.onerror=()=>rej(req.error); }); }
+async function idbGetFile(id){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction('files','readonly'); const req=tx.objectStore('files').get(id); req.onsuccess=()=>res(req.result); req.onerror=()=>rej(req.error); }); }
+async function idbDeleteFile(id){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction('files','readwrite'); tx.objectStore('files').delete(id); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
+
+function supDrop(e,sid){ e.preventDefault(); e.currentTarget.classList.remove('dragover'); supAddFiles(e.dataTransfer.files, sid); }
+function supPick(input,sid){ supAddFiles(input.files, sid); input.value=''; }
+async function supAddFiles(files, sid){
+  const arr=[...files]; if(!arr.length) return;
+  const MAX = 30*1024*1024; // 1ファイル30MBまで
+  let ok=0;
+  for(const f of arr){
+    if(f.size>MAX){ toast(`「${f.name}」は大きすぎます（30MBまで）`,'error'); continue; }
+    const rec={ id:'f'+Date.now().toString(36)+Math.random().toString(36).slice(2,7), supplierId:sid, name:f.name, type:f.type||'', size:f.size, addedAt:new Date().toISOString(), blob:f };
+    try{ await idbAddFile(rec); ok++; }catch(err){ toast('保存に失敗: '+(err&&err.message||err),'error'); }
+  }
+  if(ok) toast(`ファイルを保存しました（この端末・${ok}件）`,'success');
+  loadSupplierFiles(sid);
+}
+async function loadSupplierFiles(sid){
+  const el=document.getElementById('supFiles_'+sid); if(!el) return;
+  let files=[]; try{ files=await idbFilesBySupplier(sid); }catch(e){}
+  files.sort((a,b)=>String(b.addedAt).localeCompare(String(a.addedAt)));
+  if(!files.length){ el.innerHTML=`<div class="sup-nofile">保存されたファイルはありません</div>`; return; }
+  el.innerHTML = files.map(f=>`<div class="sup-file">
+    <span class="sup-file-ic">${supFileIcon(f.name)}</span>
+    <span class="sup-file-name" title="${esc(f.name)}">${esc(f.name)}</span>
+    <span class="sup-file-size">${supFmtBytes(f.size)}</span>
+    <button class="sup-file-btn" onclick="supOpenFile('${f.id}')">開く</button>
+    <button class="sup-file-btn" onclick="supDownloadFile('${f.id}')" title="ダウンロード">⬇</button>
+    <button class="sup-file-btn del" onclick="supDeleteFile('${f.id}','${sid}')" title="削除">🗑</button>
+  </div>`).join('');
+}
+async function supOpenFile(id){ try{ const r=await idbGetFile(id); if(!r) return; const url=URL.createObjectURL(r.blob); window.open(url,'_blank'); setTimeout(()=>URL.revokeObjectURL(url),60000); }catch(e){ toast('開けませんでした','error'); } }
+async function supDownloadFile(id){ try{ const r=await idbGetFile(id); if(!r) return; const url=URL.createObjectURL(r.blob); const a=document.createElement('a'); a.href=url; a.download=r.name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},100); }catch(e){ toast('ダウンロードできませんでした','error'); } }
+async function supDeleteFile(id,sid){ if(!confirm('このファイルを削除しますか？')) return; try{ await idbDeleteFile(id); }catch(e){} loadSupplierFiles(sid); toast('削除しました',''); }
+function supFileIcon(name){ const n=String(name||'').toLowerCase(); if(n.endsWith('.pdf'))return '📕'; if(/\.(xlsx|xls|csv)$/.test(n))return '📗'; if(/\.(doc|docx)$/.test(n))return '📘'; if(/\.(png|jpe?g|gif|heic)$/.test(n))return '🖼'; return '📄'; }
+function supFmtBytes(b){ b=Number(b)||0; if(b<1024)return b+'B'; if(b<1024*1024)return (b/1024).toFixed(0)+'KB'; return (b/1024/1024).toFixed(1)+'MB'; }
 
 /* ===== 商品一覧描画 ===== */
 function updateLatestCodeBadge(){
