@@ -81,6 +81,7 @@
   .source-btn:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.12)}
   .source-btn.active.costco{background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);border-color:#e31837;color:#7f1d1d;box-shadow:0 6px 16px rgba(227,24,55,.25)}
   .source-btn.active.maker{background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 100%);border-color:#2563eb;color:#1e3a8a;box-shadow:0 6px 16px rgba(37,99,235,.25)}
+  .source-btn.active.ledger{background:linear-gradient(135deg,#ede9fe 0%,#ddd6fe 100%);border-color:#7c3aed;color:#5b21b6;box-shadow:0 6px 16px rgba(124,58,237,.25)}
   .source-btn .src-icon{font-size:22px}
   .source-btn .src-count{font-size:12px;font-weight:700;background:rgba(255,255,255,.7);padding:2px 8px;border-radius:10px;margin-left:4px}
 
@@ -954,6 +955,11 @@
     <span>メーカー・卸商品</span>
     <span class="src-count" id="srcCountMaker">0</span>
   </button>
+  <button type="button" class="source-btn ledger" id="srcBtnLedger" onclick="openSuppliersView()">
+    <span class="src-icon">📒</span>
+    <span>メーカー問屋管理帳</span>
+    <span class="src-count" id="srcCountLedger">0</span>
+  </button>
 </div>
 
 <nav class="tabs">
@@ -961,7 +967,6 @@
   <button class="tab-btn" data-tab="settings">⚙️ 手数料・基本設定</button>
   <button class="tab-btn" data-tab="calc">💰 利益計算</button>
   <button class="tab-btn" data-tab="calculator">🧮 電卓</button>
-  <button class="tab-btn" data-tab="suppliers">🏭 メーカー問屋管理帳</button>
   <button class="tab-btn" data-tab="data">💾 データ管理</button>
 </nav>
 
@@ -1791,9 +1796,11 @@ function switchSource(src){
     const sf = document.getElementById('saleFilter');
     if(sf && (sf.value==='sale'||sf.value==='normal')) sf.value='';
   }
-  // ボタンのアクティブ状態を更新
-  document.getElementById('srcBtnCostco').classList.toggle('active', src==='costco');
-  document.getElementById('srcBtnMaker').classList.toggle('active', src==='maker');
+  // 管理帳ビューを見ていたら商品一覧へ戻す（コストコ/メーカーは商品ビュー）
+  const _supTab = document.getElementById('tab-suppliers');
+  if(_supTab && getComputedStyle(_supTab).display!=='none'){ switchTab('products'); }
+  // 切替列のアクティブ表示を更新（コストコ/メーカー/管理帳）
+  syncSourceRowActive();
   // ヘッダーのサブタイトル切り替え
   const subEl = document.querySelector('.costco-title .sub');
   if(subEl){
@@ -1813,6 +1820,8 @@ function updateSourceCounts(){
   const mEl = document.getElementById('srcCountMaker');
   if(cEl) cEl.textContent = costcoCount;
   if(mEl) mEl.textContent = makerCount;
+  const lEl = document.getElementById('srcCountLedger');
+  if(lEl) lEl.textContent = Array.isArray(state.suppliers)?state.suppliers.length:0;
 }
 
 // ===== ローカル読み込み（オフライン時） =====
@@ -2477,7 +2486,19 @@ function switchTab(tab){
   if(tab==='suppliers') renderSuppliers();
   if(tab==='calc' && window.ProfitCalc) window.ProfitCalc.init();
   if(tab==='calculator' && window.Calc10) window.Calc10.init();
+  syncSourceRowActive();
 }
+// 上部の切替列（コストコ / メーカー / 管理帳）のアクティブ表示を、今の表示ビューに合わせる
+function syncSourceRowActive(){
+  const supTab = document.getElementById('tab-suppliers');
+  const onLedger = supTab && getComputedStyle(supTab).display!=='none';
+  const src = state.currentSource || 'costco';
+  document.getElementById('srcBtnLedger')?.classList.toggle('active', !!onLedger);
+  document.getElementById('srcBtnCostco')?.classList.toggle('active', !onLedger && src==='costco');
+  document.getElementById('srcBtnMaker')?.classList.toggle('active', !onLedger && src==='maker');
+}
+// 管理帳カードを押したとき：管理帳ビュー（suppliersタブ）を開く
+function openSuppliersView(){ switchTab('suppliers'); }
 document.querySelectorAll('.tab-btn').forEach(b=>{
   b.addEventListener('click',()=>switchTab(b.dataset.tab));
 });
@@ -2538,6 +2559,7 @@ function renderSuppliers(){
   if(q) list = list.filter(s=> [s.name,s.contact,s.phone,s.email,s.address,s.memo,s.codes,s.terms].map(x=>String(x||'').toLowerCase()).some(v=>v.includes(q)));
   list.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''),'ja'));
   const cnt=document.getElementById('supCount'); if(cnt) cnt.textContent = `${list.length} / ${state.suppliers.length} 件`;
+  const lEl=document.getElementById('srcCountLedger'); if(lEl) lEl.textContent = state.suppliers.length;
   if(!list.length){ wrap.innerHTML = `<div class="sup-empty">${state.suppliers.length?'該当する取引先がありません':'まだ取引先がありません。「＋ 取引先を追加」から登録してください。'}</div>`; return; }
   wrap.innerHTML = list.map(renderSupplierCard).join('');
   list.forEach(s=> loadSupplierFiles(s.id));
