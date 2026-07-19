@@ -82,6 +82,7 @@
   .source-btn.active.costco{background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);border-color:#e31837;color:#7f1d1d;box-shadow:0 6px 16px rgba(227,24,55,.25)}
   .source-btn.active.maker{background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 100%);border-color:#2563eb;color:#1e3a8a;box-shadow:0 6px 16px rgba(37,99,235,.25)}
   .source-btn.active.ledger{background:linear-gradient(135deg,#ede9fe 0%,#ddd6fe 100%);border-color:#7c3aed;color:#5b21b6;box-shadow:0 6px 16px rgba(124,58,237,.25)}
+  .source-btn.active.calc{background:linear-gradient(135deg,#d1fae5 0%,#a7f3d0 100%);border-color:#059669;color:#065f46;box-shadow:0 6px 16px rgba(5,150,105,.25)}
   .source-btn .src-icon{font-size:22px}
   .source-btn .src-count{font-size:12px;font-weight:700;background:rgba(255,255,255,.7);padding:2px 8px;border-radius:10px;margin-left:4px}
 
@@ -572,6 +573,8 @@
   #tab-calc .calc-paste-status.calc-ok{color:#10b981}
   #tab-calc .calc-paste-status.calc-ng{color:#f59e0b}
   #tab-calc .calc-paste-status.calc-err{color:#ef4444}
+  #tab-calc .calc-paste-clear{margin-top:4px;padding:3px 9px;border:1px solid #fbcfe8;background:#fff;color:#be185d;border-radius:8px;font-size:10px;font-weight:800;cursor:pointer;transition:all .12s}
+  #tab-calc .calc-paste-clear:hover{background:#fce7f3;border-color:#f472b6}
   #tab-calc .calc-result-cell{text-align:right;font-size:16px;font-weight:800;padding:6px 12px !important;white-space:nowrap;border-radius:10px}
   #tab-calc .calc-result-cell.calc-sales{color:#9b6bff}
   #tab-calc .calc-profit.calc-positive{color:#10b981;background:#ecfdf5}
@@ -960,12 +963,15 @@
     <span>メーカー問屋管理帳</span>
     <span class="src-count" id="srcCountLedger">0</span>
   </button>
+  <button type="button" class="source-btn calc" id="srcBtnCalc" onclick="switchTab('calc')">
+    <span class="src-icon">💰</span>
+    <span>利益計算</span>
+  </button>
 </div>
 
 <nav class="tabs">
   <button class="tab-btn active" data-tab="products">📋 商品一覧</button>
   <button class="tab-btn" data-tab="settings">⚙️ 手数料・基本設定</button>
-  <button class="tab-btn" data-tab="calc">💰 利益計算</button>
   <button class="tab-btn" data-tab="calculator">🧮 電卓</button>
   <button class="tab-btn" data-tab="data">💾 データ管理</button>
 </nav>
@@ -1796,10 +1802,10 @@ function switchSource(src){
     const sf = document.getElementById('saleFilter');
     if(sf && (sf.value==='sale'||sf.value==='normal')) sf.value='';
   }
-  // 管理帳ビューを見ていたら商品一覧へ戻す（コストコ/メーカーは商品ビュー）
-  const _supTab = document.getElementById('tab-suppliers');
-  if(_supTab && getComputedStyle(_supTab).display!=='none'){ switchTab('products'); }
-  // 切替列のアクティブ表示を更新（コストコ/メーカー/管理帳）
+  // 管理帳/利益計算ビューを見ていたら商品一覧へ戻す（コストコ/メーカーは商品ビュー）
+  const _isVis = id => { const el=document.getElementById(id); return el && getComputedStyle(el).display!=='none'; };
+  if(_isVis('tab-suppliers') || _isVis('tab-calc')){ switchTab('products'); }
+  // 切替列のアクティブ表示を更新（コストコ/メーカー/管理帳/利益計算）
   syncSourceRowActive();
   // ヘッダーのサブタイトル切り替え
   const subEl = document.querySelector('.costco-title .sub');
@@ -2488,14 +2494,17 @@ function switchTab(tab){
   if(tab==='calculator' && window.Calc10) window.Calc10.init();
   syncSourceRowActive();
 }
-// 上部の切替列（コストコ / メーカー / 管理帳）のアクティブ表示を、今の表示ビューに合わせる
+// 上部の切替列（コストコ / メーカー / 管理帳 / 利益計算）のアクティブ表示を、今の表示ビューに合わせる
 function syncSourceRowActive(){
-  const supTab = document.getElementById('tab-suppliers');
-  const onLedger = supTab && getComputedStyle(supTab).display!=='none';
+  const vis = id => { const el=document.getElementById(id); return !!(el && getComputedStyle(el).display!=='none'); };
+  const onLedger = vis('tab-suppliers');
+  const onCalc = vis('tab-calc');
+  const sourceView = !onLedger && !onCalc;
   const src = state.currentSource || 'costco';
-  document.getElementById('srcBtnLedger')?.classList.toggle('active', !!onLedger);
-  document.getElementById('srcBtnCostco')?.classList.toggle('active', !onLedger && src==='costco');
-  document.getElementById('srcBtnMaker')?.classList.toggle('active', !onLedger && src==='maker');
+  document.getElementById('srcBtnLedger')?.classList.toggle('active', onLedger);
+  document.getElementById('srcBtnCalc')?.classList.toggle('active', onCalc);
+  document.getElementById('srcBtnCostco')?.classList.toggle('active', sourceView && src==='costco');
+  document.getElementById('srcBtnMaker')?.classList.toggle('active', sourceView && src==='maker');
 }
 // 管理帳カードを押したとき：管理帳ビュー（suppliersタブ）を開く
 function openSuppliersView(){ switchTab('suppliers'); }
@@ -5532,6 +5541,7 @@ window.ProfitCalc = (function(){
         <td class="calc-paste-cell">
           <textarea class="calc-paste-area" data-card-id="${c.id}" data-key="paste" placeholder="例: 20x15x5cm 200g&#10;(ぺたっと貼るだけ♡)">${c.paste||''}</textarea>
           <div class="calc-paste-status ${c.pasteStatusCls||''}">${c.pasteStatus||''}</div>
+          <button type="button" class="calc-paste-clear" data-action="clearpaste" data-card-id="${c.id}" title="サイズ・送料をクリア">🧹 サイズをクリア</button>
         </td>
         <td><input type="text" inputmode="numeric" class="calc-money-input" data-card-id="${c.id}" data-key="ship" value="${fmt(c.ship)}" placeholder="0"></td>
         <td class="calc-result-cell calc-sales">${yen(sales)}</td>
@@ -5661,6 +5671,15 @@ window.ProfitCalc = (function(){
     updatePasteUI(id); updateResults(); saveData();
   }
 
+  // サイズ貼付欄をクリア（毎回消す手間をなくすリセット）。送料も0に戻す
+  function clearPaste(id){
+    const c = cards.find(c=>c.id===id); if(!c) return;
+    c.paste=''; c.pasteStatus=''; c.pasteStatusCls=''; c.ship=0;
+    const ta = tbody.querySelector(`textarea[data-card-id="${id}"]`); if(ta) ta.value='';
+    const shipInput = tbody.querySelector(`input[data-card-id="${id}"][data-key="ship"]`); if(shipInput) shipInput.value='0';
+    updatePasteUI(id); updateResults(); saveData();
+  }
+
   function updatePasteUI(id){
     const c = cards.find(c=>c.id===id); if(!c||!tbody) return;
     const textarea = tbody.querySelector(`textarea[data-card-id="${id}"]`);
@@ -5690,6 +5709,8 @@ window.ProfitCalc = (function(){
       else if(el.tagName==='TEXTAREA' && key==='paste'){ onPaste(id, el.value); }
     });
     tbody.addEventListener('click', e=>{
+      const clr = e.target.closest('[data-action="clearpaste"]');
+      if(clr){ clearPaste(+clr.dataset.cardId); return; }
       const btn = e.target.closest('[data-action="remove"]');
       if(btn){ removeCard(+btn.dataset.cardId); }
     });
