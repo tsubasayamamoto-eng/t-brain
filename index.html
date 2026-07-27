@@ -2477,10 +2477,12 @@ function calcProfit(set, costPerUnit, feePercent){
   const price = num(set.price);
   const shipping = num(set.shipping);
   const cost = num(costPerUnit) * qty;
-  const fee = price * num(feePercent)/100;
+  // 手数料：金額が入力されていればその額を使用、空欄なら手数料率×販売価格で自動計算
+  const hasFixedFee = set.feeAmount!==undefined && set.feeAmount!==null && String(set.feeAmount).trim()!=='';
+  const fee = hasFixedFee ? num(set.feeAmount) : price * num(feePercent)/100;
   const profit = price - cost - shipping - fee;
   const margin = price>0 ? (profit/price*100) : 0;
-  return {price,cost,shipping,fee,profit,margin};
+  return {price,cost,shipping,fee,profit,margin,feeFixed:hasFixedFee};
 }
 
 /* ===== タブ切り替え ===== */
@@ -3569,6 +3571,7 @@ function renderSetRow(mall, set){
     <div><label class="field">入数</label><input type="number" data-k="qty" min="1" value="${set.qty||1}"></div>
     <div><label class="field">販売価格(税込)</label><input type="number" data-k="price" min="0" value="${set.price??''}"></div>
     <div><label class="field">出荷送料</label><input type="number" data-k="shipping" min="0" value="${set.shipping||0}"></div>
+    <div><label class="field">手数料(任意)</label><input type="number" data-k="feeAmount" min="0" value="${(set.feeAmount!==undefined&&set.feeAmount!==null&&set.feeAmount!=='')?set.feeAmount:''}" placeholder="率で自動" title="空欄なら手数料率で自動計算。金額を入れるとその額を手数料にします"></div>
     <div><label class="field">利益</label><div class="calc-field" data-calc="profit">¥0</div></div>
     <div><label class="field">粗利率</label><div class="calc-field" data-calc="margin">0.0%</div></div>
     <div><button type="button" class="icon-btn" onclick="this.closest('.set-row').remove();updateSetCalcs('${mall}')">🗑</button></div>`;
@@ -3960,10 +3963,12 @@ function updateSetCalcs(mall){
   document.querySelectorAll('#sets_'+mall+' .set-row').forEach(row=>{
     const costType = row.querySelector('[data-k=costType]').value;
     const cost = getEditingCost(costType);
+    const feeAmtEl = row.querySelector('[data-k=feeAmount]');
     const set={
       qty: num(row.querySelector('[data-k=qty]').value)||1,
       price: num(row.querySelector('[data-k=price]').value),
-      shipping: num(row.querySelector('[data-k=shipping]').value)
+      shipping: num(row.querySelector('[data-k=shipping]').value),
+      feeAmount: feeAmtEl ? feeAmtEl.value : ''
     };
     const r = calcProfit(set,cost,fee);
     const pf = row.querySelector('[data-calc=profit]');
@@ -3979,12 +3984,14 @@ function collectSets(mall){
   const out=[];
   document.querySelectorAll('#sets_'+mall+' .set-row').forEach(row=>{
     const at = row.querySelector('[data-k=asinTarget]');
+    const feeRaw = (row.querySelector('[data-k=feeAmount]')?.value ?? '').trim();
     out.push({
       label: row.querySelector('[data-k=label]').value,
       costType: row.querySelector('[data-k=costType]').value || 'case',
       qty: num(row.querySelector('[data-k=qty]').value)||1,
       price: num(row.querySelector('[data-k=price]').value),
       shipping: num(row.querySelector('[data-k=shipping]').value),
+      ...(feeRaw!=='' ? {feeAmount: num(feeRaw)} : {}),
       ...(at ? {asinTarget: at.value || 'main'} : {})
     });
   });
