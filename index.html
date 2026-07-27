@@ -373,6 +373,8 @@
   .set-row{display:grid;grid-template-columns:120px 90px 70px 110px 100px 100px 100px 34px;gap:6px;align-items:end;margin-bottom:6px;padding:8px;background:#fff;border-radius:6px;border:1px solid var(--border)}
   .set-row[data-mall="amazon"]{grid-template-columns:110px 80px 90px 70px 110px 90px 90px 90px 34px}
   .set-row .calc-field{background:#eef2ff;padding:7px 10px;border-radius:5px;font-size:12px;font-weight:800;text-align:right;color:#1e40af}
+  .set-row .set-fee-note{font-size:10px;font-weight:700;color:#94a3b8;margin-top:3px;white-space:nowrap}
+  .set-row .set-fee-note.manual{color:#be185d}
   .set-row .calc-field.neg{background:#fee2e2;color:#991b1b}
   .icon-btn{background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px;padding:4px}
   .icon-btn:hover{color:#991b1b}
@@ -3571,7 +3573,7 @@ function renderSetRow(mall, set){
     <div><label class="field">入数</label><input type="number" data-k="qty" min="1" value="${set.qty||1}"></div>
     <div><label class="field">販売価格(税込)</label><input type="number" data-k="price" min="0" value="${set.price??''}"></div>
     <div><label class="field">出荷送料</label><input type="number" data-k="shipping" min="0" value="${set.shipping||0}"></div>
-    <div><label class="field">手数料(任意)</label><input type="number" data-k="feeAmount" min="0" value="${(set.feeAmount!==undefined&&set.feeAmount!==null&&set.feeAmount!=='')?set.feeAmount:''}" placeholder="率で自動" title="空欄なら手数料率で自動計算。金額を入れるとその額を手数料にします"></div>
+    <div><label class="field">手数料</label><input type="number" data-k="feeAmount" min="0" value="${(set.feeAmount!==undefined&&set.feeAmount!==null&&set.feeAmount!=='')?set.feeAmount:''}" placeholder="自動" title="空欄なら手数料率で自動計算されます（今まで通り）。必要なときだけ金額を入れて変更できます"><div class="set-fee-note" data-calc="feeNote"></div></div>
     <div><label class="field">利益</label><div class="calc-field" data-calc="profit">¥0</div></div>
     <div><label class="field">粗利率</label><div class="calc-field" data-calc="margin">0.0%</div></div>
     <div><button type="button" class="icon-btn" onclick="this.closest('.set-row').remove();updateSetCalcs('${mall}')">🗑</button></div>`;
@@ -3977,6 +3979,12 @@ function updateSetCalcs(mall){
     mg.textContent = pct(r.margin);
     pf.classList.toggle('neg', r.profit<0);
     mg.classList.toggle('neg', r.profit<0);
+    // 適用中の手数料を常に表示（今まで通り自動で入っている／手動で変更したが一目で分かる）
+    const note = row.querySelector('[data-calc=feeNote]');
+    if(note){
+      note.textContent = set.price>0 ? `適用 ¥${fmt(r.fee)}（${r.feeFixed?'手動':'自動'}）` : '';
+      note.classList.toggle('manual', r.feeFixed);
+    }
   });
 }
 
