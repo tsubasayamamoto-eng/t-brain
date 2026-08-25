@@ -656,6 +656,15 @@
   .sup-filter-btn{padding:6px 14px;border:1px solid #e5c4d6;background:#fff;border-radius:999px;font-size:12px;font-weight:800;color:#9d5b7f;cursor:pointer;transition:all .12s}
   .sup-filter-btn:hover{background:#fdf2f8}
   .sup-filter-btn.active{background:linear-gradient(135deg,#f472b6,#ec4899);color:#fff;border-color:transparent}
+  .sup-status-filter-btn{padding:5px 12px;border:1px solid #e2e8f0;background:#fff;border-radius:999px;font-size:12px;font-weight:800;color:#64748b;cursor:pointer;transition:all .12s}
+  .sup-status-filter-btn:hover{background:#f8fafc}
+  .sup-status-filter-btn.active{background:#334155;color:#fff;border-color:transparent}
+  /* 取引状況セレクト（カード内・色分け） */
+  .sup-status-select{font-size:11px;font-weight:800;padding:2px 6px;border-radius:999px;border:1px solid;cursor:pointer;-webkit-appearance:none;appearance:none;text-align:center}
+  .sup-status-select.st-trading{background:#dcfce7;color:#166534;border-color:#86efac}
+  .sup-status-select.st-nego{background:#fef3c7;color:#92400e;border-color:#fcd34d}
+  .sup-status-select.st-none{background:#f1f5f9;color:#64748b;border-color:#cbd5e1}
+  .sup-status-select.st-paused{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
   .sup-search{flex:1;min-width:200px;padding:8px 12px;border:1px solid #e5c4d6;border-radius:10px;font-size:13px}
   .sup-count{font-size:12px;font-weight:800;color:#9ca3af;white-space:nowrap}
   .sup-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
@@ -1359,6 +1368,14 @@
         <input type="text" class="sup-search" placeholder="🔍 会社名・担当・電話・メモで検索" oninput="supSearch(this.value)">
         <span class="sup-count" id="supCount">0 件</span>
       </div>
+      <div class="sup-filters" style="margin-bottom:14px">
+        <span style="font-size:12px;font-weight:800;color:#9d5b7f;align-self:center">取引状況：</span>
+        <button class="sup-status-filter-btn active" data-sst="all" onclick="supSetStatusFilter('all')">すべて</button>
+        <button class="sup-status-filter-btn" data-sst="trading" onclick="supSetStatusFilter('trading')">🤝 取引中</button>
+        <button class="sup-status-filter-btn" data-sst="negotiating" onclick="supSetStatusFilter('negotiating')">💬 交渉中</button>
+        <button class="sup-status-filter-btn" data-sst="none" onclick="supSetStatusFilter('none')">⚪ 未取引</button>
+        <button class="sup-status-filter-btn" data-sst="paused" onclick="supSetStatusFilter('paused')">⏸ 休止</button>
+      </div>
       <div id="supplierList" class="sup-list"></div>
     </div>
   </section>
@@ -1374,10 +1391,14 @@
     <div class="body">
       <fieldset>
         <legend>取引先情報</legend>
-        <div class="grid" style="grid-template-columns:150px 1fr">
+        <div class="grid" style="grid-template-columns:150px 150px 1fr">
           <div>
             <label class="field">種別</label>
             <select id="sup_type"><option value="maker">🏭 メーカー</option><option value="wholesaler">🏢 問屋・卸</option></select>
+          </div>
+          <div>
+            <label class="field">取引状況</label>
+            <select id="sup_status"><option value="trading">🤝 取引中</option><option value="negotiating">💬 交渉中</option><option value="none">⚪ 未取引</option><option value="paused">⏸ 休止</option></select>
           </div>
           <div>
             <label class="field">会社名 *</label>
@@ -2594,8 +2615,16 @@ function updateFee(mall,val){
 
 /* ===== メーカー問屋管理帳 ===== */
 const SUP_TYPES = {maker:{label:'メーカー',icon:'🏭',cls:'sup-maker'}, wholesaler:{label:'問屋・卸',icon:'🏢',cls:'sup-whole'}};
+// 取引状況
+const SUP_STATUSES = {
+  trading:{label:'取引中',icon:'🤝',cls:'st-trading'},
+  negotiating:{label:'交渉中',icon:'💬',cls:'st-nego'},
+  none:{label:'未取引',icon:'⚪',cls:'st-none'},
+  paused:{label:'休止',icon:'⏸',cls:'st-paused'},
+};
+function supStatus(s){ return (s && SUP_STATUSES[s.status]) ? s.status : 'trading'; } // 既定＝取引中
 let editingSupplierId = null;
-let _supFilter = {type:'all', q:''};
+let _supFilter = {type:'all', status:'all', q:''};
 function ensureSuppliers(){ if(!Array.isArray(state.suppliers)) state.suppliers=[]; return state.suppliers; }
 // 取引先(テキスト情報)を fees ブロックに相乗りさせてGAS同期する（バックエンド無改修）。ファイル本体は同期しない(端末ローカル)
 function feesPayload(){ ensureSuppliers(); return JSON.stringify({...state.fees, __suppliers: state.suppliers}); }
@@ -2605,8 +2634,9 @@ function renderSuppliers(){
   const wrap = document.getElementById('supplierList'); if(!wrap) return;
   let list = state.suppliers.slice();
   if(_supFilter.type!=='all') list = list.filter(s=>s.type===_supFilter.type);
+  if(_supFilter.status && _supFilter.status!=='all') list = list.filter(s=>supStatus(s)===_supFilter.status);
   const q = _supFilter.q.trim().toLowerCase();
-  if(q) list = list.filter(s=> [s.name,s.contact,s.phone,s.fax,s.email,s.address,s.memo,s.codes,s.terms].map(x=>String(x||'').toLowerCase()).some(v=>v.includes(q)));
+  if(q) list = list.filter(s=> [s.name,s.contact,s.phone,s.fax,s.email,s.address,s.memo,s.codes,s.terms,SUP_STATUSES[supStatus(s)].label].map(x=>String(x||'').toLowerCase()).some(v=>v.includes(q)));
   list.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''),'ja'));
   const cnt=document.getElementById('supCount'); if(cnt) cnt.textContent = `${list.length} / ${state.suppliers.length} 件`;
   const lEl=document.getElementById('srcCountLedger'); if(lEl) lEl.textContent = state.suppliers.length;
@@ -2621,6 +2651,9 @@ function renderSupplierCard(s){
   return `<div class="sup-card ${t.cls}" data-sid="${s.id}">
     <div class="sup-head">
       <span class="sup-type-badge ${t.cls}">${t.icon} ${t.label}</span>
+      <select class="sup-status-select ${SUP_STATUSES[supStatus(s)].cls}" title="取引状況（クリックで変更）" onchange="setSupplierStatus('${s.id}',this.value)">
+        ${Object.entries(SUP_STATUSES).map(([k,v])=>`<option value="${k}" ${supStatus(s)===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}
+      </select>
       <div class="sup-actions"><button class="btn light sm" onclick="openSupplierModal('${s.id}')">✏️ 編集</button><button class="btn light sm" style="background:#fee2e2;color:#991b1b" onclick="deleteSupplierById('${s.id}')" title="この取引先を削除">🗑 削除</button></div>
     </div>
     <div class="sup-name">${esc(s.name||'（無名）')}</div>
@@ -2644,7 +2677,19 @@ function renderSupplierCard(s){
   </div>`;
 }
 function supSetFilter(type){ _supFilter.type=type; document.querySelectorAll('.sup-filter-btn').forEach(b=>b.classList.toggle('active', b.dataset.sft===type)); renderSuppliers(); }
+function supSetStatusFilter(st){ _supFilter.status=st; document.querySelectorAll('.sup-status-filter-btn').forEach(b=>b.classList.toggle('active', b.dataset.sst===st)); renderSuppliers(); }
 function supSearch(v){ _supFilter.q=v; renderSuppliers(); }
+// カードから取引状況を変更（再描画せず色だけ更新）
+function setSupplierStatus(id,val){
+  ensureSuppliers();
+  const s=state.suppliers.find(x=>x.id===id); if(!s || !SUP_STATUSES[val]) return;
+  s.status=val; s.updatedAt=new Date().toISOString();
+  saveState();
+  const sel=document.querySelector(`.sup-card[data-sid="${id}"] .sup-status-select`);
+  if(sel) sel.className='sup-status-select '+SUP_STATUSES[val].cls;
+  // 状況で絞り込み中に、変更後がマッチしなくなったら一覧から外す
+  if(_supFilter.status && _supFilter.status!=='all' && val!==_supFilter.status) renderSuppliers();
+}
 // カードから直接削除
 function deleteSupplierById(id){
   ensureSuppliers();
@@ -2773,7 +2818,7 @@ function runSupplierImport(){
     existing.add(r.name);
     const type = r._typeExplicit ? r.type : defType;
     const {_typeExplicit, ...rec} = r;
-    state.suppliers.push({ id:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), ...rec, type, updatedAt:new Date().toISOString() });
+    state.suppliers.push({ id:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), ...rec, type, status:'trading', updatedAt:new Date().toISOString() });
     added++;
   });
   saveState();
@@ -2788,6 +2833,7 @@ function openSupplierModal(id){
   const s = id? state.suppliers.find(x=>x.id===id):null;
   document.getElementById('supModalTitle').textContent = s?'取引先を編集':'取引先を追加';
   document.getElementById('sup_type').value = s?.type||'maker';
+  document.getElementById('sup_status').value = s?supStatus(s):'trading';
   document.getElementById('sup_name').value = s?.name||'';
   document.getElementById('sup_contact').value = s?.contact||'';
   document.getElementById('sup_phone').value = s?.phone||'';
@@ -2808,6 +2854,7 @@ function saveSupplier(){
   const data={
     id: editingSupplierId||('s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
     type: document.getElementById('sup_type').value,
+    status: document.getElementById('sup_status').value,
     name,
     contact:document.getElementById('sup_contact').value.trim(),
     phone:document.getElementById('sup_phone').value.trim(),
