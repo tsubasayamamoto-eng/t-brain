@@ -2929,20 +2929,23 @@ const PARENT_CODE_FIELDS = [
   {id:'f_asinCode3', warn:'asinCode3Warn'},
   {id:'f_asinCode4', warn:'asinCode4Warn'},
 ];
+// メイン相乗り番号(f_code)とASIN①(f_asinCode1)は同一商品なので同じスロット扱い＝両者一致は重複としない
+function codeGroup(id){ return (id==='f_code' || id==='f_asinCode1') ? 'main' : id; }
 function checkAllCodes(){
   const items = PARENT_CODE_FIELDS.map(f=>{
     const el=document.getElementById(f.id);
     const raw=el?el.value.trim():'';
     return {...f, el, val: raw?normalizeParentCode(raw):''};
   });
-  const counts={};
-  items.forEach(it=>{ if(it.val) counts[it.val]=(counts[it.val]||0)+1; });
+  // 値ごとに「異なるスロット」を集計（同一スロットの一致は重複としない）
+  const valGroups={};
+  items.forEach(it=>{ if(it.val){ (valGroups[it.val]=valGroups[it.val]||new Set()).add(codeGroup(it.id)); } });
   items.forEach(it=>{
     if(!it.el) return;
     const warnEl=document.getElementById(it.warn);
     const clear=()=>{ if(warnEl){warnEl.style.display='none';} it.el.classList.remove('dup-input'); };
     if(!it.val){ clear(); return; }
-    if(counts[it.val]>1){
+    if(valGroups[it.val] && valGroups[it.val].size>1){
       if(warnEl){ warnEl.innerHTML='⚠ この相乗り番号がこの画面内で重複しています'; warnEl.style.display='block'; }
       it.el.classList.add('dup-input'); return;
     }
@@ -4332,11 +4335,11 @@ function saveProduct(){
     {id:'f_asinCode3', v:normalizeParentCode(document.getElementById('f_asinCode3').value)},
     {id:'f_asinCode4', v:normalizeParentCode(document.getElementById('f_asinCode4').value)},
   ].filter(e=>e.v);
-  // 画面内の重複
-  const seenCodes={};
+  // 画面内の重複（メイン相乗り番号とASIN①は同一扱いなので、両者が同じでもOK）
+  const groupsByVal={};
+  for(const e of parentEntries){ (groupsByVal[e.v]=groupsByVal[e.v]||new Set()).add(codeGroup(e.id)); }
   for(const e of parentEntries){
-    if(seenCodes[e.v]){ toast(`相乗り番号「${e.v}」がこの画面内で重複しています`,'error'); document.getElementById(e.id).focus(); return; }
-    seenCodes[e.v]=true;
+    if(groupsByVal[e.v].size>1){ toast(`相乗り番号「${e.v}」がこの画面内で重複しています`,'error'); document.getElementById(e.id).focus(); return; }
   }
   // 他商品との重複
   for(const e of parentEntries){
