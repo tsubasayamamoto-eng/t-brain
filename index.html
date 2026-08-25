@@ -1340,6 +1340,7 @@
       <div class="sup-toolbar">
         <h2 style="margin:0">🏭 メーカー問屋管理帳</h2>
         <div style="display:flex;gap:8px">
+          <button type="button" class="btn light" style="font-weight:800;padding:10px 16px;background:#fee2e2;color:#991b1b" onclick="clearAllSuppliers()" title="取引先を全部削除（インポートのやり直し用）">🗑 全件削除</button>
           <button type="button" class="btn light" style="font-weight:800;padding:10px 16px" onclick="openSupplierImport()">📥 一括インポート</button>
           <button type="button" class="btn" style="background:#16a34a;color:#fff;font-weight:800;padding:10px 20px" onclick="openSupplierModal()">＋ 取引先を追加</button>
         </div>
@@ -2608,7 +2609,7 @@ function renderSupplierCard(s){
     <div class="sup-head">
       <span class="sup-type-badge ${t.cls}">${t.icon} ${t.label}</span>
       <span class="sup-name">${esc(s.name||'（無名）')}</span>
-      <div class="sup-actions"><button class="btn light sm" onclick="openSupplierModal('${s.id}')">✏️ 編集</button></div>
+      <div class="sup-actions"><button class="btn light sm" onclick="openSupplierModal('${s.id}')">✏️ 編集</button><button class="btn light sm" style="background:#fee2e2;color:#991b1b" onclick="deleteSupplierById('${s.id}')" title="この取引先を削除">🗑 削除</button></div>
     </div>
     <div class="sup-body">
       ${row('👤', s.contact)}
@@ -2631,6 +2632,27 @@ function renderSupplierCard(s){
 }
 function supSetFilter(type){ _supFilter.type=type; document.querySelectorAll('.sup-filter-btn').forEach(b=>b.classList.toggle('active', b.dataset.sft===type)); renderSuppliers(); }
 function supSearch(v){ _supFilter.q=v; renderSuppliers(); }
+// カードから直接削除
+function deleteSupplierById(id){
+  ensureSuppliers();
+  const s = state.suppliers.find(x=>x.id===id); if(!s) return;
+  if(!confirm(`「${s.name||'（無名）'}」を削除しますか？\n（この端末に保存した見積ファイルも一緒に消えます）`)) return;
+  idbFilesBySupplier(id).then(fs=>fs.forEach(f=>idbDeleteFile(f.id))).catch(()=>{});
+  state.suppliers = state.suppliers.filter(x=>x.id!==id);
+  saveState(); renderSuppliers();
+  toast('削除しました','');
+}
+// 全件削除（インポートのやり直し用）
+function clearAllSuppliers(){
+  ensureSuppliers();
+  const n = state.suppliers.length;
+  if(!n){ toast('取引先はありません',''); return; }
+  if(!confirm(`取引先 ${n} 件をすべて削除します。よろしいですか？\n（この端末に保存した見積ファイルも消えます。元に戻せません）`)) return;
+  state.suppliers.forEach(s=>{ idbFilesBySupplier(s.id).then(fs=>fs.forEach(f=>idbDeleteFile(f.id))).catch(()=>{}); });
+  state.suppliers = [];
+  saveState(); renderSuppliers();
+  toast(`${n} 件を削除しました`,'success');
+}
 
 /* ---- 一括インポート（スプレッドシート貼り付け） ---- */
 function openSupplierImport(){
@@ -2639,40 +2661,86 @@ function openSupplierImport(){
   document.getElementById('supplierImportModal').classList.add('show');
 }
 function closeSupplierImport(){ document.getElementById('supplierImportModal').classList.remove('show'); }
-// 種別の表記ゆれを maker/wholesaler に正規化
+// 種別の表記ゆれ／社名から maker/wholesaler を推定
 function normSupType(v){
   const s=String(v||'').trim();
-  if(/問屋|卸|商社|商事|ホールセール|wholesale/i.test(s)) return 'wholesaler';
+  if(/問屋|卸|商社|商事|物産|商会|ホールセール|wholesale/i.test(s)) return 'wholesaler';
   return 'maker';
 }
-// タブ区切り(TSV)テキストを取引先レコード配列に変換。先頭行が見出しなら列名で対応付け
+// 貼り付けテキストを取引先レコード配列に変換。
+//  ①見出し行があれば列名で対応付け ②無ければ各列の中身から自動判定（生のスプレッドシート貼り付け対応）
 function parseSupplierTSV(text){
-  // 各行はタブ区切り(スプレッドシート由来)を優先、無ければ「|」区切り(手貼り用)に対応
+  // 各行はタブ区切り(スプレッドシート由来)を優先、無ければ「|」区切り(手貼り用)
   const rows = String(text||'').replace(/\r/g,'').split('\n')
     .filter(l=>l.trim()!=='')
     .map(l=> (l.includes('\t') ? l.split('\t') : l.split('|')).map(c=>String(c).trim()));
   if(!rows.length) return [];
+
   const FIELD_ALIAS = {
     type:['種別','区分','タイプ','type'], name:['会社名','社名','名前','取引先','会社','name'],
     contact:['担当','担当者','contact'], phone:['電話','tel','電話番号','phone'],
     fax:['fax','ファックス','ファクス'], email:['メール','email','mail','e-mail'],
     address:['住所','所在地','address'], terms:['掛率','条件','取引条件','terms'], memo:['メモ','備考','memo','note']
   };
-  const headerCells = rows[0].map(c=>String(c).trim());
-  const looksHeader = headerCells.some(c=>/種別|会社名|社名|担当|電話|メール|住所|fax/i.test(c));
-  let colMap=null;
+  const headerCells = rows[0];
+  const looksHeader = headerCells.some(c=>/^(種別|区分|会社名|社名|取引先|担当者?|電話|電話番号|tel|fax|メール|mail|住所|所在地|掛率|メモ|備考)$/i.test(c.replace(/\s/g,'')));
+
   if(looksHeader){
-    colMap={};
-    headerCells.forEach((h,i)=>{ for(const f in FIELD_ALIAS){ if(FIELD_ALIAS[f].some(a=>h.replace(/\s/g,'').toLowerCase()===a.toLowerCase())){ colMap[f]=i; break; } } });
+    // --- 見出しあり：列名で対応付け ---
+    const colMap={};
+    headerCells.forEach((h,i)=>{ const hn=h.replace(/\s/g,'').toLowerCase(); for(const f in FIELD_ALIAS){ if(FIELD_ALIAS[f].some(a=>hn===a.toLowerCase())){ colMap[f]=i; break; } } });
+    const out=[];
+    rows.slice(1).forEach(cells=>{
+      const g = key => { const idx=colMap[key]; return (idx!=null && cells[idx]!=null) ? String(cells[idx]).trim() : ''; };
+      const name=g('name'); if(!name) return;
+      const type = colMap.type!=null ? normSupType(g('type')) : normSupType(name);
+      out.push({ type, name, contact:g('contact'), phone:g('phone'), fax:g('fax'), email:g('email'), address:g('address'), terms:g('terms'), memo:g('memo') });
+    });
+    return out;
   }
-  const dataRows = looksHeader ? rows.slice(1) : rows;
-  const ORDER=['type','name','contact','phone','fax','email','address','terms','memo'];
+
+  // --- 見出しなし：中身から列を自動判定 ---
+  const ncol = Math.max(...rows.map(r=>r.length));
+  const cols=[]; for(let i=0;i<ncol;i++) cols.push(rows.map(r=>(r[i]||'').trim()));
+  const ne = c => c.filter(Boolean);
+  const cnt = (c,fn)=> ne(c).filter(fn).length;
+  const isPostal = v=>/^〒?\s*\d{3}-?\d{4}$/.test(v);
+  const isPref = v=> v.length<=4 && /(都|道|府|県)$/.test(v);
+  const dig = v=>v.replace(/\D/g,'');
+  const isPhone = v=>{ if(isPostal(v)) return false; const d=dig(v); return d.length>=10 && d.length<=11 && d[0]==='0'; };
+  const isEmail = v=>/@/.test(v);
+  const isCompany = v=>/(株式会社|有限会社|合同会社|合資会社|㈱|㈲|Corporation|商事|物産|工業|化学|食品|工房|製作所|商会|商店|製菓|本舗|産業|釣具)/.test(v);
+  const hasAddr = v=>/[都道府県市区郡町村]|丁目|番地|[0-9]+[-−][0-9]/.test(v);
+
+  let nameCol=-1,emailCol=-1,postalCol=-1,prefCol=-1,contactCol=-1; const phoneCols=[],addrCols=[];
+  // 会社名列＝法人格の一致が最多の列
+  let bc=0; cols.forEach((c,i)=>{ const s=cnt(c,isCompany); if(s>bc){bc=s;nameCol=i;} });
+  if(nameCol<0){ for(let i=0;i<ncol;i++){ if(ne(cols[i]).length && !cnt(cols[i],isPhone) && !cnt(cols[i],isEmail) && !cnt(cols[i],isPostal)){ nameCol=i; break; } } }
+  cols.forEach((c,i)=>{
+    if(i===nameCol) return;
+    const n = ne(c).length || 1;
+    if(emailCol<0 && cnt(c,isEmail)>0){ emailCol=i; return; }
+    if(postalCol<0 && cnt(c,isPostal)>=n*0.5){ postalCol=i; return; }
+    if(prefCol<0 && cnt(c,isPref)>=n*0.5){ prefCol=i; return; }
+    if(cnt(c,isPhone)>=n*0.5){ phoneCols.push(i); return; }
+  });
+  const used=new Set([nameCol,emailCol,postalCol,prefCol,...phoneCols]);
+  for(let i=0;i<ncol;i++){
+    if(used.has(i)) continue;
+    const c=ne(cols[i]);
+    const addrHits=c.filter(hasAddr).length;
+    const avg=c.reduce((a,v)=>a+v.length,0)/(c.length||1);
+    if(addrHits>=Math.max(1,c.length*0.4) || avg>=7) addrCols.push(i);
+    else if(contactCol<0) contactCol=i;
+    else addrCols.push(i);
+  }
+  const addrOrder=[]; if(postalCol>=0)addrOrder.push(postalCol); if(prefCol>=0)addrOrder.push(prefCol); addrCols.forEach(i=>addrOrder.push(i));
   const out=[];
-  dataRows.forEach(cells=>{
-    const g = key => { const idx = colMap ? colMap[key] : ORDER.indexOf(key); return (idx!=null && idx>=0 && cells[idx]!=null) ? String(cells[idx]).trim() : ''; };
-    const name = g('name');
-    if(!name) return;
-    out.push({ type:normSupType(g('type')), name, contact:g('contact'), phone:g('phone'), fax:g('fax'), email:g('email'), address:g('address'), terms:g('terms'), memo:g('memo') });
+  rows.forEach(r=>{
+    const g=i=>(i>=0 && r[i]!=null)?String(r[i]).trim():'';
+    const name=g(nameCol); if(!name) return;
+    const address=addrOrder.map(g).filter(Boolean).join(' ');
+    out.push({ type:normSupType(name+' '), name, contact:g(contactCol), phone:g(phoneCols.length?phoneCols[0]:-1), fax:g(phoneCols.length>1?phoneCols[1]:-1), email:g(emailCol), address, terms:'', memo:'' });
   });
   return out;
 }
