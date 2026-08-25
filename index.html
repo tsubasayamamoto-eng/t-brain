@@ -1339,7 +1339,10 @@
     <div class="panel">
       <div class="sup-toolbar">
         <h2 style="margin:0">🏭 メーカー問屋管理帳</h2>
-        <button type="button" class="btn" style="background:#16a34a;color:#fff;font-weight:800;padding:10px 20px" onclick="openSupplierModal()">＋ 取引先を追加</button>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn light" style="font-weight:800;padding:10px 16px" onclick="openSupplierImport()">📥 一括インポート</button>
+          <button type="button" class="btn" style="background:#16a34a;color:#fff;font-weight:800;padding:10px 20px" onclick="openSupplierModal()">＋ 取引先を追加</button>
+        </div>
       </div>
       <p class="help">取引しているメーカー・問屋の情報を保存できます。<b>取引先情報は全PC・スマホで共有</b>されます。見積などのファイルは各カードに<b>この端末へ保存</b>できます（その端末でだけ開けます）。</p>
       <div class="sup-controls">
@@ -1379,6 +1382,7 @@
         <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:10px">
           <div><label class="field">担当者</label><input type="text" id="sup_contact" placeholder="例: 山田様"></div>
           <div><label class="field">電話</label><input type="text" id="sup_phone" placeholder="例: 052-000-0000"></div>
+          <div><label class="field">FAX</label><input type="text" id="sup_fax" placeholder="例: 052-000-0001"></div>
           <div><label class="field">メール</label><input type="text" id="sup_email" placeholder="例: info@example.com"></div>
           <div><label class="field">掛率・取引条件</label><input type="text" id="sup_terms" placeholder="例: 掛率70% / ロット10個〜"></div>
         </div>
@@ -1393,6 +1397,25 @@
         <button type="button" class="btn secondary" onclick="closeSupplierModal()">キャンセル</button>
         <button type="button" class="btn" style="background:#16a34a;color:#fff;font-weight:800" onclick="saveSupplier()">💾 保存</button>
       </div>
+    </footer>
+  </div>
+</div>
+
+<!-- ===== 取引先 一括インポートモーダル ===== -->
+<div class="modal-back" id="supplierImportModal">
+  <div class="modal" style="max-width:720px">
+    <header>
+      <h2><span class="modal-char"><span class="kawaii"><svg width="30" height="30"><use href="#char-kitty"/></svg></span></span>取引先を一括インポート</h2>
+      <button type="button" class="btn light sm" onclick="closeSupplierImport()">✕ 閉じる</button>
+    </header>
+    <div class="body">
+      <p class="help">スプレッドシートからコピーした表（タブ区切り）を下に貼り付けて「取り込む」を押してください。先頭行は見出し行にできます（種別 / 会社名 / 担当者 / 電話 / FAX / メール / 住所 / 掛率 / メモ の順、または見出し名で自動判定）。<b>会社名が既に登録済みの取引先はスキップ</b>します（重複しません）。</p>
+      <textarea id="supImportText" rows="12" placeholder="種別	会社名	担当者	電話	FAX	メール	住所&#10;メーカー	株式会社〇〇	山田様	052-000-0000	052-000-0001	info@example.com	愛知県…" style="width:100%;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:12px;padding:10px;border:1px solid #d1d5db;border-radius:8px;white-space:pre;overflow:auto"></textarea>
+      <div id="supImportPreview" style="margin-top:8px;font-size:12px;font-weight:700;color:#6b7280"></div>
+    </div>
+    <footer style="display:flex;justify-content:flex-end;align-items:center;padding:14px 24px;border-top:1px solid #fce7f3;gap:8px">
+      <button type="button" class="btn secondary" onclick="closeSupplierImport()">キャンセル</button>
+      <button type="button" class="btn" style="background:#16a34a;color:#fff;font-weight:800" onclick="runSupplierImport()">📥 取り込む</button>
     </footer>
   </div>
 </div>
@@ -2569,7 +2592,7 @@ function renderSuppliers(){
   let list = state.suppliers.slice();
   if(_supFilter.type!=='all') list = list.filter(s=>s.type===_supFilter.type);
   const q = _supFilter.q.trim().toLowerCase();
-  if(q) list = list.filter(s=> [s.name,s.contact,s.phone,s.email,s.address,s.memo,s.codes,s.terms].map(x=>String(x||'').toLowerCase()).some(v=>v.includes(q)));
+  if(q) list = list.filter(s=> [s.name,s.contact,s.phone,s.fax,s.email,s.address,s.memo,s.codes,s.terms].map(x=>String(x||'').toLowerCase()).some(v=>v.includes(q)));
   list.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''),'ja'));
   const cnt=document.getElementById('supCount'); if(cnt) cnt.textContent = `${list.length} / ${state.suppliers.length} 件`;
   const lEl=document.getElementById('srcCountLedger'); if(lEl) lEl.textContent = state.suppliers.length;
@@ -2590,6 +2613,7 @@ function renderSupplierCard(s){
     <div class="sup-body">
       ${row('👤', s.contact)}
       ${row('📞', s.phone, tel)}
+      ${row('📠', s.fax)}
       ${row('✉️', s.email, s.email?('mailto:'+s.email):'')}
       ${row('📍', s.address)}
       ${row('💹', s.terms)}
@@ -2608,6 +2632,68 @@ function renderSupplierCard(s){
 function supSetFilter(type){ _supFilter.type=type; document.querySelectorAll('.sup-filter-btn').forEach(b=>b.classList.toggle('active', b.dataset.sft===type)); renderSuppliers(); }
 function supSearch(v){ _supFilter.q=v; renderSuppliers(); }
 
+/* ---- 一括インポート（スプレッドシート貼り付け） ---- */
+function openSupplierImport(){
+  document.getElementById('supImportText').value='';
+  document.getElementById('supImportPreview').textContent='';
+  document.getElementById('supplierImportModal').classList.add('show');
+}
+function closeSupplierImport(){ document.getElementById('supplierImportModal').classList.remove('show'); }
+// 種別の表記ゆれを maker/wholesaler に正規化
+function normSupType(v){
+  const s=String(v||'').trim();
+  if(/問屋|卸|商社|商事|ホールセール|wholesale/i.test(s)) return 'wholesaler';
+  return 'maker';
+}
+// タブ区切り(TSV)テキストを取引先レコード配列に変換。先頭行が見出しなら列名で対応付け
+function parseSupplierTSV(text){
+  // 各行はタブ区切り(スプレッドシート由来)を優先、無ければ「|」区切り(手貼り用)に対応
+  const rows = String(text||'').replace(/\r/g,'').split('\n')
+    .filter(l=>l.trim()!=='')
+    .map(l=> (l.includes('\t') ? l.split('\t') : l.split('|')).map(c=>String(c).trim()));
+  if(!rows.length) return [];
+  const FIELD_ALIAS = {
+    type:['種別','区分','タイプ','type'], name:['会社名','社名','名前','取引先','会社','name'],
+    contact:['担当','担当者','contact'], phone:['電話','tel','電話番号','phone'],
+    fax:['fax','ファックス','ファクス'], email:['メール','email','mail','e-mail'],
+    address:['住所','所在地','address'], terms:['掛率','条件','取引条件','terms'], memo:['メモ','備考','memo','note']
+  };
+  const headerCells = rows[0].map(c=>String(c).trim());
+  const looksHeader = headerCells.some(c=>/種別|会社名|社名|担当|電話|メール|住所|fax/i.test(c));
+  let colMap=null;
+  if(looksHeader){
+    colMap={};
+    headerCells.forEach((h,i)=>{ for(const f in FIELD_ALIAS){ if(FIELD_ALIAS[f].some(a=>h.replace(/\s/g,'').toLowerCase()===a.toLowerCase())){ colMap[f]=i; break; } } });
+  }
+  const dataRows = looksHeader ? rows.slice(1) : rows;
+  const ORDER=['type','name','contact','phone','fax','email','address','terms','memo'];
+  const out=[];
+  dataRows.forEach(cells=>{
+    const g = key => { const idx = colMap ? colMap[key] : ORDER.indexOf(key); return (idx!=null && idx>=0 && cells[idx]!=null) ? String(cells[idx]).trim() : ''; };
+    const name = g('name');
+    if(!name) return;
+    out.push({ type:normSupType(g('type')), name, contact:g('contact'), phone:g('phone'), fax:g('fax'), email:g('email'), address:g('address'), terms:g('terms'), memo:g('memo') });
+  });
+  return out;
+}
+function runSupplierImport(){
+  ensureSuppliers();
+  const parsed = parseSupplierTSV(document.getElementById('supImportText').value);
+  if(!parsed.length){ toast('取り込めるデータがありません（会社名の列を確認してください）','error'); return; }
+  const existing = new Set(state.suppliers.map(s=>String(s.name||'').trim()));
+  let added=0, skipped=0;
+  parsed.forEach(r=>{
+    if(existing.has(r.name)){ skipped++; return; }
+    existing.add(r.name);
+    state.suppliers.push({ id:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), ...r, updatedAt:new Date().toISOString() });
+    added++;
+  });
+  saveState();
+  closeSupplierImport();
+  renderSuppliers();
+  toast(`取り込み完了：${added}件を追加${skipped?`（重複${skipped}件はスキップ）`:''}`,'success');
+}
+
 function openSupplierModal(id){
   ensureSuppliers();
   editingSupplierId = id||null;
@@ -2617,6 +2703,7 @@ function openSupplierModal(id){
   document.getElementById('sup_name').value = s?.name||'';
   document.getElementById('sup_contact').value = s?.contact||'';
   document.getElementById('sup_phone').value = s?.phone||'';
+  document.getElementById('sup_fax').value = s?.fax||'';
   document.getElementById('sup_email').value = s?.email||'';
   document.getElementById('sup_address').value = s?.address||'';
   document.getElementById('sup_terms').value = s?.terms||'';
@@ -2636,6 +2723,7 @@ function saveSupplier(){
     name,
     contact:document.getElementById('sup_contact').value.trim(),
     phone:document.getElementById('sup_phone').value.trim(),
+    fax:document.getElementById('sup_fax').value.trim(),
     email:document.getElementById('sup_email').value.trim(),
     address:document.getElementById('sup_address').value.trim(),
     terms:document.getElementById('sup_terms').value.trim(),
