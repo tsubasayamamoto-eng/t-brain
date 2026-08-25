@@ -1520,7 +1520,7 @@
         <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr 120px">
           <div>
             <label class="field">相乗り番号 *</label>
-            <input type="text" id="f_code" placeholder="例: J0015（自動で -a が付きます）" oninput="checkDupCode('code')" onblur="this.value=normalizeParentCode(this.value)">
+            <input type="text" id="f_code" placeholder="例: J0015（自動で -a が付きます）" oninput="checkAllCodes()" onblur="this.value=normalizeParentCode(this.value);checkAllCodes()">
             <div id="codeDupWarn" class="dup-warn" style="display:none"></div>
           </div>
           <div>
@@ -1534,29 +1534,33 @@
               <div>
                 <div style="display:flex;gap:6px;align-items:center">
                   <input type="text" id="f_asin" placeholder="ASIN①" oninput="updateAsinPreview()" style="font-size:12px;flex:1">
-                  <input type="text" id="f_asinCode1" placeholder="相乗り番号（自動-a）" style="font-size:11px;width:110px;background:#fef3c7;border-color:#fbbf24" onblur="if(this.value.trim())this.value=normalizeParentCode(this.value)">
+                  <input type="text" id="f_asinCode1" placeholder="相乗り番号（自動-a）" style="font-size:11px;width:110px;background:#fef3c7;border-color:#fbbf24" oninput="checkAllCodes()" onblur="if(this.value.trim())this.value=normalizeParentCode(this.value);checkAllCodes()">
                 </div>
+                <div id="asinCode1Warn" class="dup-warn" style="display:none;font-size:10px"></div>
                 <div id="asinPreview" class="help" style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
               </div>
               <div>
                 <div style="display:flex;gap:6px;align-items:center">
                   <input type="text" id="f_asin2" placeholder="ASIN②" oninput="updateAsinPreview()" style="font-size:12px;flex:1">
-                  <input type="text" id="f_asinCode2" placeholder="相乗り番号（自動-a）" style="font-size:11px;width:110px;background:#fef3c7;border-color:#fbbf24" onblur="if(this.value.trim())this.value=normalizeParentCode(this.value)">
+                  <input type="text" id="f_asinCode2" placeholder="相乗り番号（自動-a）" style="font-size:11px;width:110px;background:#fef3c7;border-color:#fbbf24" oninput="checkAllCodes()" onblur="if(this.value.trim())this.value=normalizeParentCode(this.value);checkAllCodes()">
                 </div>
+                <div id="asinCode2Warn" class="dup-warn" style="display:none;font-size:10px"></div>
                 <div id="asin2Preview" class="help" style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
               </div>
               <div>
                 <div style="display:flex;gap:6px;align-items:center">
                   <input type="text" id="f_asin3" placeholder="ASIN③" oninput="updateAsinPreview()" style="font-size:12px;flex:1">
-                  <input type="text" id="f_asinCode3" placeholder="相乗り番号（自動-a）" style="font-size:11px;width:110px;background:#fef3c7;border-color:#fbbf24" onblur="if(this.value.trim())this.value=normalizeParentCode(this.value)">
+                  <input type="text" id="f_asinCode3" placeholder="相乗り番号（自動-a）" style="font-size:11px;width:110px;background:#fef3c7;border-color:#fbbf24" oninput="checkAllCodes()" onblur="if(this.value.trim())this.value=normalizeParentCode(this.value);checkAllCodes()">
                 </div>
+                <div id="asinCode3Warn" class="dup-warn" style="display:none;font-size:10px"></div>
                 <div id="asin3Preview" class="help" style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
               </div>
               <div>
                 <div style="display:flex;gap:6px;align-items:center">
                   <input type="text" id="f_asin4" placeholder="ASIN④" oninput="updateAsinPreview()" style="font-size:12px;flex:1">
-                  <input type="text" id="f_asinCode4" placeholder="相乗り番号（自動-a）" style="font-size:11px;width:110px;background:#fef3c7;border-color:#fbbf24" onblur="if(this.value.trim())this.value=normalizeParentCode(this.value)">
+                  <input type="text" id="f_asinCode4" placeholder="相乗り番号（自動-a）" style="font-size:11px;width:110px;background:#fef3c7;border-color:#fbbf24" oninput="checkAllCodes()" onblur="if(this.value.trim())this.value=normalizeParentCode(this.value);checkAllCodes()">
                 </div>
+                <div id="asinCode4Warn" class="dup-warn" style="display:none;font-size:10px"></div>
                 <div id="asin4Preview" class="help" style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
               </div>
             </div>
@@ -2917,7 +2921,41 @@ function copyLatest(type){
   if(!code || code==='—'){ toast('コピーするコードがありません','error'); return; }
   navigator.clipboard.writeText(code).then(()=>toast('コピーしました: '+code,'success'));
 }
+// 相乗り番号（メイン f_code ＋ ASIN別 f_asinCode1〜4）の重複をまとめてチェック（画面内の重複＋他商品との重複）
+const PARENT_CODE_FIELDS = [
+  {id:'f_code', warn:'codeDupWarn'},
+  {id:'f_asinCode1', warn:'asinCode1Warn'},
+  {id:'f_asinCode2', warn:'asinCode2Warn'},
+  {id:'f_asinCode3', warn:'asinCode3Warn'},
+  {id:'f_asinCode4', warn:'asinCode4Warn'},
+];
+function checkAllCodes(){
+  const items = PARENT_CODE_FIELDS.map(f=>{
+    const el=document.getElementById(f.id);
+    const raw=el?el.value.trim():'';
+    return {...f, el, val: raw?normalizeParentCode(raw):''};
+  });
+  const counts={};
+  items.forEach(it=>{ if(it.val) counts[it.val]=(counts[it.val]||0)+1; });
+  items.forEach(it=>{
+    if(!it.el) return;
+    const warnEl=document.getElementById(it.warn);
+    const clear=()=>{ if(warnEl){warnEl.style.display='none';} it.el.classList.remove('dup-input'); };
+    if(!it.val){ clear(); return; }
+    if(counts[it.val]>1){
+      if(warnEl){ warnEl.innerHTML='⚠ この相乗り番号がこの画面内で重複しています'; warnEl.style.display='block'; }
+      it.el.classList.add('dup-input'); return;
+    }
+    const dup = state.products.find(x=>x.id!==editingProductId && parentCodesOf(x).includes(it.val));
+    if(dup){
+      if(warnEl){ warnEl.innerHTML=`⚠ この相乗り番号は既に登録されています: <strong>${esc(dup.name||'無名')}</strong>`; warnEl.style.display='block'; }
+      it.el.classList.add('dup-input'); return;
+    }
+    clear();
+  });
+}
 function checkDupCode(kind){
+  if(kind==='code'){ checkAllCodes(); return; }
   const inputId = kind==='code' ? 'f_code' : 'f_productCode';
   const warnId = kind==='code' ? 'codeDupWarn' : 'productCodeDupWarn';
   const inputEl = document.getElementById(inputId);
@@ -4286,14 +4324,24 @@ function saveProduct(){
   if(!name){toast('品名を入力してください','error');return}
   if(!code && !productCode){toast('商品コードまたは相乗り番号を入力してください','error');return}
 
-  // 重複チェック（自分自身は除外）※相乗り番号は他商品の asinCode1~4 も含めて漏れなく照合
-  if(code){
-    const dup = state.products.find(x=>x.id!==editingProductId && parentCodesOf(x).includes(code));
-    if(dup){
-      toast(`相乗り番号「${code}」は既に登録されています（${dup.name||'無名'}）`,'error');
-      document.getElementById('f_code').focus();
-      return;
-    }
+  // 重複チェック（自分自身は除外）※メイン＋ASIN別の相乗り番号すべてを、画面内・他商品の両方で照合
+  const parentEntries = [
+    {id:'f_code', v:code},
+    {id:'f_asinCode1', v:normalizeParentCode(document.getElementById('f_asinCode1').value)},
+    {id:'f_asinCode2', v:normalizeParentCode(document.getElementById('f_asinCode2').value)},
+    {id:'f_asinCode3', v:normalizeParentCode(document.getElementById('f_asinCode3').value)},
+    {id:'f_asinCode4', v:normalizeParentCode(document.getElementById('f_asinCode4').value)},
+  ].filter(e=>e.v);
+  // 画面内の重複
+  const seenCodes={};
+  for(const e of parentEntries){
+    if(seenCodes[e.v]){ toast(`相乗り番号「${e.v}」がこの画面内で重複しています`,'error'); document.getElementById(e.id).focus(); return; }
+    seenCodes[e.v]=true;
+  }
+  // 他商品との重複
+  for(const e of parentEntries){
+    const dup = state.products.find(x=>x.id!==editingProductId && parentCodesOf(x).includes(e.v));
+    if(dup){ toast(`相乗り番号「${e.v}」は既に登録されています（${dup.name||'無名'}）`,'error'); document.getElementById(e.id).focus(); return; }
   }
   if(productCode){
     const dup = state.products.find(x=>x.id!==editingProductId && x.productCode && x.productCode===productCode);
