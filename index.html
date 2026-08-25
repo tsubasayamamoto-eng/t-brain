@@ -660,12 +660,13 @@
   .sup-card{border:1px solid #f3d5e5;border-radius:16px;background:#fff;box-shadow:0 3px 10px rgba(244,114,182,.10);overflow:hidden;display:flex;flex-direction:column}
   .sup-card.sup-maker{border-top:4px solid #fb923c}
   .sup-card.sup-whole{border-top:4px solid #a78bfa}
-  .sup-head{display:flex;align-items:center;gap:8px;padding:12px 14px 8px;flex-wrap:wrap}
+  .sup-head{display:flex;align-items:center;gap:8px;padding:12px 14px 2px}
   .sup-type-badge{font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;white-space:nowrap}
   .sup-type-badge.sup-maker{background:#fff4e6;color:#b45309;border:1px solid #fed7aa}
   .sup-type-badge.sup-whole{background:#f3e8ff;color:#6b21a8;border:1px solid #ddd6fe}
-  .sup-name{font-size:16px;font-weight:900;color:#3d2d3d;flex:1;min-width:0;word-break:break-word}
-  .sup-actions{margin-left:auto}
+  .sup-name{font-size:16px;font-weight:900;color:#3d2d3d;padding:0 14px 8px;word-break:break-word;line-height:1.35}
+  .sup-actions{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
+  .sup-actions .btn{white-space:nowrap}
   .sup-body{padding:2px 14px 10px;display:flex;flex-direction:column;gap:4px}
   .sup-row{display:flex;gap:7px;font-size:12.5px;color:#4b3a47;align-items:flex-start}
   .sup-row .sup-ic{flex-shrink:0;width:16px;text-align:center}
@@ -1410,7 +1411,12 @@
       <button type="button" class="btn light sm" onclick="closeSupplierImport()">✕ 閉じる</button>
     </header>
     <div class="body">
-      <p class="help">スプレッドシートからコピーした表（タブ区切り）を下に貼り付けて「取り込む」を押してください。先頭行は見出し行にできます（種別 / 会社名 / 担当者 / 電話 / FAX / メール / 住所 / 掛率 / メモ の順、または見出し名で自動判定）。<b>会社名が既に登録済みの取引先はスキップ</b>します（重複しません）。</p>
+      <p class="help">スプレッドシートからコピーした表（タブ区切り）を下に貼り付けて「取り込む」を押してください。列は中身から自動判定します（見出し行があればそれを優先）。<b>会社名が既に登録済みの取引先はスキップ</b>します（重複しません）。</p>
+      <div style="display:flex;align-items:center;gap:10px;margin:6px 0 10px;padding:8px 12px;background:#fdf6fb;border-radius:10px">
+        <label class="field" style="margin:0">取り込む種別</label>
+        <select id="supImportType" style="max-width:180px"><option value="maker">🏭 メーカー</option><option value="wholesaler">🏢 問屋・卸</option></select>
+        <span style="font-size:11px;color:#9d5b7f">※貼り付けデータに「種別」列があればそちらを優先します</span>
+      </div>
       <textarea id="supImportText" rows="12" placeholder="種別	会社名	担当者	電話	FAX	メール	住所&#10;メーカー	株式会社〇〇	山田様	052-000-0000	052-000-0001	info@example.com	愛知県…" style="width:100%;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:12px;padding:10px;border:1px solid #d1d5db;border-radius:8px;white-space:pre;overflow:auto"></textarea>
       <div id="supImportPreview" style="margin-top:8px;font-size:12px;font-weight:700;color:#6b7280"></div>
     </div>
@@ -2608,9 +2614,9 @@ function renderSupplierCard(s){
   return `<div class="sup-card ${t.cls}" data-sid="${s.id}">
     <div class="sup-head">
       <span class="sup-type-badge ${t.cls}">${t.icon} ${t.label}</span>
-      <span class="sup-name">${esc(s.name||'（無名）')}</span>
       <div class="sup-actions"><button class="btn light sm" onclick="openSupplierModal('${s.id}')">✏️ 編集</button><button class="btn light sm" style="background:#fee2e2;color:#991b1b" onclick="deleteSupplierById('${s.id}')" title="この取引先を削除">🗑 削除</button></div>
     </div>
+    <div class="sup-name">${esc(s.name||'（無名）')}</div>
     <div class="sup-body">
       ${row('👤', s.contact)}
       ${row('📞', s.phone, tel)}
@@ -2658,6 +2664,9 @@ function clearAllSuppliers(){
 function openSupplierImport(){
   document.getElementById('supImportText').value='';
   document.getElementById('supImportPreview').textContent='';
+  // 今開いている絞り込み(メーカー/問屋)を既定の種別にする
+  const sel=document.getElementById('supImportType');
+  if(sel) sel.value = (_supFilter.type==='wholesaler') ? 'wholesaler' : 'maker';
   document.getElementById('supplierImportModal').classList.add('show');
 }
 function closeSupplierImport(){ document.getElementById('supplierImportModal').classList.remove('show'); }
@@ -2693,8 +2702,8 @@ function parseSupplierTSV(text){
     rows.slice(1).forEach(cells=>{
       const g = key => { const idx=colMap[key]; return (idx!=null && cells[idx]!=null) ? String(cells[idx]).trim() : ''; };
       const name=g('name'); if(!name) return;
-      const type = colMap.type!=null ? normSupType(g('type')) : normSupType(name);
-      out.push({ type, name, contact:g('contact'), phone:g('phone'), fax:g('fax'), email:g('email'), address:g('address'), terms:g('terms'), memo:g('memo') });
+      const explicit = colMap.type!=null && g('type')!=='';
+      out.push({ type: explicit ? normSupType(g('type')) : normSupType(name), _typeExplicit:explicit, name, contact:g('contact'), phone:g('phone'), fax:g('fax'), email:g('email'), address:g('address'), terms:g('terms'), memo:g('memo') });
     });
     return out;
   }
@@ -2740,7 +2749,7 @@ function parseSupplierTSV(text){
     const g=i=>(i>=0 && r[i]!=null)?String(r[i]).trim():'';
     const name=g(nameCol); if(!name) return;
     const address=addrOrder.map(g).filter(Boolean).join(' ');
-    out.push({ type:normSupType(name+' '), name, contact:g(contactCol), phone:g(phoneCols.length?phoneCols[0]:-1), fax:g(phoneCols.length>1?phoneCols[1]:-1), email:g(emailCol), address, terms:'', memo:'' });
+    out.push({ type:normSupType(name+' '), _typeExplicit:false, name, contact:g(contactCol), phone:g(phoneCols.length?phoneCols[0]:-1), fax:g(phoneCols.length>1?phoneCols[1]:-1), email:g(emailCol), address, terms:'', memo:'' });
   });
   return out;
 }
@@ -2748,12 +2757,16 @@ function runSupplierImport(){
   ensureSuppliers();
   const parsed = parseSupplierTSV(document.getElementById('supImportText').value);
   if(!parsed.length){ toast('取り込めるデータがありません（会社名の列を確認してください）','error'); return; }
+  // 種別列が無い行に適用する既定種別（モーダルの選択＝今の絞り込み）
+  const defType = document.getElementById('supImportType')?.value === 'wholesaler' ? 'wholesaler' : 'maker';
   const existing = new Set(state.suppliers.map(s=>String(s.name||'').trim()));
   let added=0, skipped=0;
   parsed.forEach(r=>{
     if(existing.has(r.name)){ skipped++; return; }
     existing.add(r.name);
-    state.suppliers.push({ id:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), ...r, updatedAt:new Date().toISOString() });
+    const type = r._typeExplicit ? r.type : defType;
+    const {_typeExplicit, ...rec} = r;
+    state.suppliers.push({ id:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), ...rec, type, updatedAt:new Date().toISOString() });
     added++;
   });
   saveState();
