@@ -783,6 +783,41 @@
   .picking-history table{width:100%;border-collapse:collapse}
   .picking-history th,.picking-history td{padding:6px 10px;border-bottom:1px solid #f3f0ff;text-align:left;font-size:11px}
   .picking-history th{color:#7c3aed}
+
+  /* ============================================================
+     📱 スマホ表示（幅680px以下のときだけ適用・PC表示は一切変わりません）
+     ============================================================ */
+  @media (max-width:680px){
+    /* ヘッダー：固定解除で重なり防止・折り返し・小型化 */
+    header.main{position:static;flex-wrap:wrap;padding:10px 12px;gap:6px}
+    header.main h1{font-size:16px}
+    header.main h1 .emoji{font-size:22px}
+    .header-chars{display:none}
+    .latest-code-badge{width:100%;justify-content:center;padding:5px 8px;gap:8px}
+    .latest-code-badge .lcb-code{font-size:14px}
+    .header-actions{width:100%;flex-wrap:wrap;gap:5px;justify-content:center}
+    .header-actions .btn{padding:7px 11px!important;font-size:12px!important}
+    /* 切替カード：2×2・横書き・固定解除 */
+    .source-switcher{position:static;flex-wrap:wrap;gap:6px;padding:8px 10px}
+    .source-btn{flex:1 1 46%;max-width:none;min-width:0;padding:10px 6px;font-size:13px;gap:5px;border-width:2px}
+    .source-btn .src-icon{font-size:18px}
+    .source-btn .src-count{font-size:11px;padding:1px 6px;margin-left:2px}
+    /* タブ：横スクロール・固定解除 */
+    nav.tabs{position:static;overflow-x:auto;flex-wrap:nowrap;padding:4px 10px 0;-webkit-overflow-scrolling:touch}
+    nav.tabs button{padding:9px 12px;font-size:12px;white-space:nowrap;flex:0 0 auto}
+    /* 本文・統計カード・パネル */
+    main{padding:12px 10px}
+    .stat-cards{grid-template-columns:repeat(2,1fr);gap:8px}
+    .panel{padding:12px;border-radius:14px}
+    /* 吹き出し（キャラのひとこと）を縮小 */
+    .kawaii-chatter{gap:8px;margin-top:8px;padding:0 10px}
+    .chatter-char{width:44px;height:44px}
+    .speech-bubble{max-width:none;flex:1;font-size:12px;padding:8px 10px}
+    /* 取引先カードは1列（見やすく） */
+    .sup-list{grid-template-columns:1fr}
+    .sup-controls{flex-wrap:wrap}
+    .sup-search{min-width:0;flex:1 1 100%}
+  }
 </style>
 <!-- ピッキングリストPDF取込用 pdf.js（cMap同梱のjsdelivrを使用：日本語CIDフォント対応） -->
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
