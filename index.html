@@ -666,6 +666,13 @@
   .sup-status-select.st-none{background:#f1f5f9;color:#64748b;border-color:#cbd5e1}
   .sup-status-select.st-paused{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
   .sup-search{flex:1;min-width:200px;padding:8px 12px;border:1px solid #e5c4d6;border-radius:10px;font-size:13px}
+  /* 名刺ドロップゾーン */
+  .sup-card-drop{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;margin:4px 0 14px;padding:16px;border:2px dashed #c4b5fd;border-radius:14px;background:linear-gradient(135deg,#faf5ff,#fdf2f8);cursor:pointer;transition:all .15s}
+  .sup-card-drop:hover{border-color:#a855f7;background:#f5f0ff}
+  .sup-card-drop.dragover{border-color:#7c3aed;background:#ede9fe;transform:scale(1.01)}
+  .sup-card-drop .scd-emoji{font-size:26px}
+  .sup-card-drop .scd-main{font-size:13px;font-weight:800;color:#6b21a8}
+  .sup-card-drop .scd-sub{font-size:11px;color:#9d5b7f}
   .sup-count{font-size:12px;font-weight:800;color:#9ca3af;white-space:nowrap}
   .sup-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
   .sup-empty{grid-column:1/-1;text-align:center;padding:40px 20px;color:#b08aa0;font-weight:700}
@@ -1389,12 +1396,18 @@
         <h2 style="margin:0">🏭 メーカー問屋管理帳</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button type="button" class="btn light" style="font-weight:800;padding:10px 16px;background:#fee2e2;color:#991b1b" onclick="clearAllSuppliers()" title="取引先を全部削除（インポートのやり直し用）">🗑 全件削除</button>
-          <label class="btn" style="background:linear-gradient(135deg,#f472b6,#a855f7);color:#fff;font-weight:800;padding:10px 16px;cursor:pointer" title="名刺を撮影/選択して文字認識で読み込む（無料）">📷 名刺を読み込む<input type="file" accept="image/*" style="display:none" onchange="supScanCardPick(this)"></label>
+          <label class="btn" style="background:linear-gradient(135deg,#f472b6,#a855f7);color:#fff;font-weight:800;padding:10px 16px;cursor:pointer" title="名刺を撮影/選択してAIで読み込む">📷 名刺を読み込む<input type="file" accept="image/*" style="display:none" onchange="supScanCardPick(this)"></label>
           <button type="button" class="btn light" style="font-weight:800;padding:10px 16px" onclick="openSupplierImport()">📥 一括インポート</button>
           <button type="button" class="btn" style="background:#16a34a;color:#fff;font-weight:800;padding:10px 20px" onclick="openSupplierModal()">＋ 取引先を追加</button>
         </div>
       </div>
       <p class="help">取引しているメーカー・問屋の情報を保存できます。<b>取引先情報は全PC・スマホで共有</b>されます。見積などのファイルは各カードに<b>この端末へ保存</b>できます（その端末でだけ開けます）。</p>
+      <label class="sup-card-drop" ondragover="supCardDragOver(event)" ondragleave="supCardDragLeave(event)" ondrop="supCardDrop(event)" title="名刺の写真をドロップ、またはクリックして選択">
+        <span class="scd-emoji">📇</span>
+        <span class="scd-main">ここに名刺の写真をドラッグ＆ドロップ（PC）</span>
+        <span class="scd-sub">またはクリックして選択／スマホは上の「📷 名刺を読み込む」でカメラ ＝ AIで自動読み取り</span>
+        <input type="file" accept="image/*" style="display:none" onchange="supScanCardPick(this)">
+      </label>
       <div class="sup-controls">
         <div class="sup-filters">
           <button class="sup-filter-btn active" data-sft="all" onclick="supSetFilter('all')">すべて</button>
@@ -2748,20 +2761,17 @@ function clearAllSuppliers(){
   toast(`${n} 件を削除しました`,'success');
 }
 
-/* ---- 名刺を無料OCR（Tesseract.js）で読み込む ---- */
-// 文字認識ライブラリを初回だけCDNから読み込む（無料・キー不要）
-let _tessLoading=null;
-function loadTesseract(){
-  if(window.Tesseract) return Promise.resolve(window.Tesseract);
-  if(_tessLoading) return _tessLoading;
-  _tessLoading=new Promise((resolve,reject)=>{
-    const s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-    s.onload=()=>window.Tesseract?resolve(window.Tesseract):reject(new Error('文字認識ライブラリを初期化できませんでした'));
-    s.onerror=()=>{ _tessLoading=null; reject(new Error('文字認識ライブラリの読み込みに失敗しました（通信環境をご確認ください）')); };
-    document.head.appendChild(s);
-  });
-  return _tessLoading;
+/* ---- 名刺をAI(Claude)で読み込む（高精度・要APIキー・写真ドラッグ&ドロップ対応） ---- */
+// AnthropicのAPIキー（このブラウザのみ・共有ファイルには含めない）
+function getAnthropicKey(force){
+  let key=''; try{ key=localStorage.getItem('anthropic_api_key')||''; }catch(e){}
+  if(!key || force){
+    const inp = prompt('名刺の読み取りに使うAnthropic(Claude)のAPIキーを入力してください。\n※このブラウザにのみ保存され、共有ファイルには含まれません。\n※キーは https://console.anthropic.com で発行できます。', key||'');
+    if(inp==null) return null;
+    key = inp.trim();
+    try{ if(key) localStorage.setItem('anthropic_api_key', key); else localStorage.removeItem('anthropic_api_key'); }catch(e){}
+  }
+  return key;
 }
 // 画像を長辺maxEdgeに縮小したデータURL（OCR速度対策・高品質保持）
 function fileToResizedDataUrl(file, maxEdge, quality){
@@ -2782,68 +2792,60 @@ function fileToResizedDataUrl(file, maxEdge, quality){
     img.src=url;
   });
 }
-function _cleanPhone(s){ return String(s).replace(/[（）()]/g,'').replace(/[ー−―\-]/g,'-').replace(/[^\d-]/g,'').replace(/-{2,}/g,'-').replace(/^-|-$/g,''); }
-const _JP_PREF='北海道|青森県|岩手県|宮城県|秋田県|山形県|福島県|茨城県|栃木県|群馬県|埼玉県|千葉県|東京都|神奈川県|新潟県|富山県|石川県|福井県|山梨県|長野県|岐阜県|静岡県|愛知県|三重県|滋賀県|京都府|大阪府|兵庫県|奈良県|和歌山県|鳥取県|島根県|岡山県|広島県|山口県|徳島県|香川県|愛媛県|高知県|福岡県|佐賀県|長崎県|熊本県|大分県|宮崎県|鹿児島県|沖縄県';
-// OCRの生テキストから各項目を推定（精度は入力画像次第。取れない分は空）
-function parseBusinessCardText(raw){
-  const text=String(raw||'');
-  const lines=text.split(/\r?\n/).map(l=>l.replace(/\s+/g,' ').trim()).filter(Boolean);
-  const info={name:'',contact:'',phone:'',fax:'',email:'',address:''};
-  const em=text.match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/);
-  if(em) info.email=em[0];
-  const phoneRe=/0\d{1,4}[\-\(\)ー−―\s]?\d{1,4}[\-\(\)ー−―\s]?\d{3,4}/g;
-  lines.forEach(l=>{
-    const isFax=/fax|ｆａｘ|ＦＡＸ|ファ.?クス/i.test(l);
-    const isTel=/tel|ｔｅｌ|ＴＥＬ|電話|℡/i.test(l);
-    const nums=l.match(phoneRe);
-    if(nums){
-      if(isFax && !info.fax) info.fax=_cleanPhone(nums[0]);
-      else if(isTel && !info.phone) info.phone=_cleanPhone(nums[0]);
-    }
-  });
-  const all=[...new Set((text.match(phoneRe)||[]).map(_cleanPhone).filter(v=>v.replace(/\D/g,'').length>=9))];
-  if(!info.phone && all[0]) info.phone=all[0];
-  if(!info.fax){ const f=all.find(v=>v!==info.phone); if(f) info.fax=f; }
-  const prefRe=new RegExp('('+_JP_PREF+')');
-  const addrParts=[];
-  lines.forEach(l=>{ if(prefRe.test(l) || (/[市区町村]/.test(l) && /[0-9０-９]/.test(l))) addrParts.push(l); });
-  const pc=text.match(/〒?\s?(\d{3}[\-‐]?\d{4})/);
-  info.address=((pc?('〒'+pc[1].replace(/[‐]/,'-')+' '):'')+addrParts.join(' ')).trim();
-  const compRe=/(株式会社|有限会社|合同会社|合資会社|㈱|㈲|Corporation|Corp\.?|Inc\.?|Co\.?,?\s?Ltd)/i;
-  const compLine=lines.find(l=>compRe.test(l));
-  if(compLine) info.name=compLine.replace(/\s+/g,'').replace(/[|｜].*$/,'');
-  const nameRe=/^[一-龥]{1,4}\s?[一-龥]{1,4}$/;
-  const contactLine=lines.find(l=> nameRe.test(l) && !compRe.test(l) && !prefRe.test(l) && l!==info.name && !/会社|営業|部|課|TEL|FAX/i.test(l));
-  if(contactLine) info.contact=contactLine.replace(/\s+/g,' ');
-  return info;
+// 名刺画像のドラッグ&ドロップ受け取り（PC用）
+function supCardDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('dragover'); }
+function supCardDragLeave(e){ e.currentTarget.classList.remove('dragover'); }
+function supCardDrop(e){
+  e.preventDefault();
+  e.currentTarget.classList.remove('dragover');
+  const dt=e.dataTransfer; if(!dt) return;
+  let f=null;
+  if(dt.files && dt.files.length){ f=[...dt.files].find(x=>/^image\//.test(x.type||'')) || dt.files[0]; }
+  if(f) scanBusinessCard(f);
+  else toast('名刺の画像ファイルをドロップしてください','error');
 }
 let _cardScanning=false;
 function supScanCardPick(input){ const f=input.files&&input.files[0]; input.value=''; if(f) scanBusinessCard(f); }
 async function scanBusinessCard(file){
   if(_cardScanning) return;
+  const key=getAnthropicKey(false);
+  if(!key){ toast('Anthropic APIキーが必要です（名刺読み取り用）','error'); return; }
   _cardScanning=true;
-  toast('名刺を読み取り中…（初回はライブラリ取得で少し時間がかかります）📇','');
+  toast('名刺をAIで読み取り中…📇','');
   try{
-    const Tesseract=await loadTesseract();
-    const dataUrl=await fileToResizedDataUrl(file, 1800, 0.92);
-    const result=await Tesseract.recognize(dataUrl, 'jpn+eng');
-    const text=(result && result.data && result.data.text) || '';
-    const info=parseBusinessCardText(text);
+    const dataUrl=await fileToResizedDataUrl(file, 1568, 0.85);
+    const b64=dataUrl.split(',')[1];
+    const instruction='この画像は日本の名刺です（回転していても読み取ってください）。記載情報を抽出し、次のキーだけを持つJSONのみを返してください（説明文やコードフェンスは不要）。\n{"name":"会社名","contact":"担当者名","phone":"電話番号","fax":"FAX番号","email":"メールアドレス","address":"郵便番号を含む住所","type":"maker または wholesaler"}\n・読み取れない項目は空文字。\n・typeは会社名や事業内容から推測（メーカー/製造系=maker、問屋・卸・商社系=wholesaler、不明ならmaker）。\n・contactは記載の個人名（役職・部署は含めない）。電話とFAXは別々に。携帯番号があればphoneに入れてよい。';
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{ 'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true', 'content-type':'application/json' },
+      body: JSON.stringify({
+        model:'claude-haiku-4-5', max_tokens:600,
+        messages:[{ role:'user', content:[
+          { type:'image', source:{ type:'base64', media_type:'image/jpeg', data:b64 } },
+          { type:'text', text:instruction }
+        ]}]
+      })
+    });
+    if(res.status===401 || res.status===403){ try{localStorage.removeItem('anthropic_api_key');}catch(e){} toast('APIキーが無効のようです。もう一度設定してください。','error'); return; }
+    if(!res.ok){ const t=await res.text().catch(()=> ''); toast('読み取りエラー: '+String(t).slice(0,80),'error'); return; }
+    const data=await res.json();
+    const text=(data.content||[]).map(c=>c.text||'').join('').trim();
+    const m=text.match(/\{[\s\S]*\}/);
+    if(!m){ toast('名刺情報を認識できませんでした','error'); return; }
+    let info; try{ info=JSON.parse(m[0]); }catch(e){ toast('読み取り結果の解析に失敗しました','error'); return; }
     // 追加モーダルを結果で開く（確認・修正して保存）
     openSupplierModal();
-    // 種別：絞り込み中(メーカー/問屋)ならそれ、すべて表示なら社名から推測
-    document.getElementById('sup_type').value = (_supFilter.type==='wholesaler'||_supFilter.type==='maker') ? _supFilter.type : normSupType(info.name);
+    const st=document.getElementById('sup_type');
+    if(info.type==='wholesaler'||info.type==='maker') st.value=info.type;
+    else st.value=(_supFilter.type==='wholesaler'||_supFilter.type==='maker')?_supFilter.type:normSupType(info.name||'');
     document.getElementById('sup_name').value=info.name||'';
     document.getElementById('sup_contact').value=info.contact||'';
     document.getElementById('sup_phone').value=info.phone||'';
     document.getElementById('sup_fax').value=info.fax||'';
     document.getElementById('sup_email').value=info.email||'';
     document.getElementById('sup_address').value=info.address||'';
-    // 生の読み取り結果をメモに（手直しの手がかり・不要なら消してOK）
-    if(text.trim()) document.getElementById('sup_memo').value='【名刺の読み取り結果（参考・修正後は消してOK）】\n'+text.trim();
-    const got=[info.name,info.phone,info.email,info.address].filter(Boolean).length;
-    if(got) toast('名刺を読み取りました。誤りを直して保存してください📇（無料OCRのため要確認）','success');
-    else toast('うまく読み取れませんでした。明るく正面から撮り直すか、手入力してください','error');
+    toast('名刺を読み取りました。内容を確認して保存してください📇✨','success');
   }catch(e){
     toast('名刺の読み取りに失敗しました: '+(e&&e.message||e),'error');
   }finally{
