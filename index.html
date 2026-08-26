@@ -1352,8 +1352,9 @@
     <div class="panel">
       <div class="sup-toolbar">
         <h2 style="margin:0">🏭 メーカー問屋管理帳</h2>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button type="button" class="btn light" style="font-weight:800;padding:10px 16px;background:#fee2e2;color:#991b1b" onclick="clearAllSuppliers()" title="取引先を全部削除（インポートのやり直し用）">🗑 全件削除</button>
+          <label class="btn" style="background:linear-gradient(135deg,#f472b6,#a855f7);color:#fff;font-weight:800;padding:10px 16px;cursor:pointer" title="名刺を撮影/選択してAIで読み込む">📷 名刺を読み込む<input type="file" accept="image/*" style="display:none" onchange="supScanCardPick(this)"></label>
           <button type="button" class="btn light" style="font-weight:800;padding:10px 16px" onclick="openSupplierImport()">📥 一括インポート</button>
           <button type="button" class="btn" style="background:#16a34a;color:#fff;font-weight:800;padding:10px 20px" onclick="openSupplierModal()">＋ 取引先を追加</button>
         </div>
@@ -2710,6 +2711,85 @@ function clearAllSuppliers(){
   state.suppliers = [];
   saveState(); renderSuppliers();
   toast(`${n} 件を削除しました`,'success');
+}
+
+/* ---- 名刺をAI（Claude）で読み込む ---- */
+// AnthropicのAPIキー（このブラウザのみ・共有ファイルには含めない）
+function getAnthropicKey(force){
+  let key=''; try{ key=localStorage.getItem('anthropic_api_key')||''; }catch(e){}
+  if(!key || force){
+    const inp = prompt('名刺の読み取りに使うAnthropic(Claude)のAPIキーを入力してください。\n※このブラウザにのみ保存され、共有ファイルには含まれません。\n※キーは https://console.anthropic.com で発行できます。', key||'');
+    if(inp==null) return null;
+    key = inp.trim();
+    try{ if(key) localStorage.setItem('anthropic_api_key', key); else localStorage.removeItem('anthropic_api_key'); }catch(e){}
+  }
+  return key;
+}
+// 画像を長辺maxEdgeに縮小しJPEGのbase64（データ部のみ）に変換
+function fileToResizedJpegBase64(file, maxEdge, quality){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+      const scale=Math.min(1, maxEdge/Math.max(w,h));
+      w=Math.max(1,Math.round(w*scale)); h=Math.max(1,Math.round(h*scale));
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      try{ resolve(cv.toDataURL('image/jpeg', quality||0.82).split(',')[1]); }
+      catch(e){ reject(e); }
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error('画像を読み込めませんでした')); };
+    img.src=url;
+  });
+}
+let _cardScanning=false;
+function supScanCardPick(input){ const f=input.files&&input.files[0]; input.value=''; if(f) scanBusinessCard(f); }
+async function scanBusinessCard(file){
+  if(_cardScanning) return;
+  const key=getAnthropicKey(false);
+  if(!key){ toast('Anthropic APIキーが必要です','error'); return; }
+  _cardScanning=true;
+  toast('名刺を読み取り中…📇','');
+  try{
+    const b64 = await fileToResizedJpegBase64(file, 1568, 0.82);
+    const instruction = 'この画像は日本の名刺です。記載情報を抽出し、次のキーだけを持つJSONのみを返してください（説明文やコードフェンスは不要）。\n{"name":"会社名","contact":"担当者名","phone":"電話番号","fax":"FAX番号","email":"メールアドレス","address":"郵便番号を含む住所","type":"maker または wholesaler"}\n・読み取れない項目は空文字。\n・typeは会社名や事業内容から推測（メーカー/製造系=maker、問屋・卸・商社系=wholesaler、不明ならmaker）。\n・contactは記載の個人名（役職は含めない）。電話とFAXは別々に。';
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{ 'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true', 'content-type':'application/json' },
+      body: JSON.stringify({
+        model:'claude-haiku-4-5-20251001', max_tokens:600,
+        messages:[{ role:'user', content:[
+          { type:'image', source:{ type:'base64', media_type:'image/jpeg', data:b64 } },
+          { type:'text', text:instruction }
+        ]}]
+      })
+    });
+    if(res.status===401 || res.status===403){ try{localStorage.removeItem('anthropic_api_key');}catch(e){} toast('APIキーが無効のようです。もう一度設定してください。','error'); return; }
+    if(!res.ok){ const t=await res.text().catch(()=> ''); toast('読み取りエラー: '+String(t).slice(0,80),'error'); return; }
+    const data=await res.json();
+    const text=(data.content||[]).map(c=>c.text||'').join('').trim();
+    const m=text.match(/\{[\s\S]*\}/);
+    if(!m){ toast('名刺情報を認識できませんでした','error'); return; }
+    let info; try{ info=JSON.parse(m[0]); }catch(e){ toast('読み取り結果の解析に失敗しました','error'); return; }
+    // 追加モーダルを結果で開く（確認・修正して保存）
+    openSupplierModal();
+    const st=document.getElementById('sup_type');
+    if(info.type==='wholesaler'||info.type==='maker') st.value=info.type;
+    else st.value=(_supFilter.type==='wholesaler')?'wholesaler':'maker';
+    document.getElementById('sup_name').value=info.name||'';
+    document.getElementById('sup_contact').value=info.contact||'';
+    document.getElementById('sup_phone').value=info.phone||'';
+    document.getElementById('sup_fax').value=info.fax||'';
+    document.getElementById('sup_email').value=info.email||'';
+    document.getElementById('sup_address').value=info.address||'';
+    toast('名刺を読み取りました。内容を確認して保存してください📇✨','success');
+  }catch(e){
+    toast('名刺の読み取りに失敗しました: '+(e&&e.message||e),'error');
+  }finally{
+    _cardScanning=false;
+  }
 }
 
 /* ---- 一括インポート（スプレッドシート貼り付け） ---- */
