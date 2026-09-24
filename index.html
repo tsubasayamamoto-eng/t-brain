@@ -378,6 +378,10 @@
   .set-row .calc-field{background:#eef2ff;padding:7px 10px;border-radius:5px;font-size:12px;font-weight:800;text-align:right;color:#1e40af}
   .set-row .set-fee-note{font-size:10px;font-weight:700;color:#94a3b8;margin-top:3px;white-space:nowrap}
   .set-row .set-fee-note.manual{color:#be185d}
+  .set-row .fee-override{display:flex;gap:2px;align-items:center}
+  .set-row .fee-override select{flex:0 0 auto;width:46px;font-size:11px;padding:6px 2px}
+  .set-row .fee-override input{flex:1 1 auto;min-width:0;width:auto}
+  .set-row .fee-override input:disabled{background:#f8fafc;color:#cbd5e1}
   .set-row .calc-field.neg{background:#fee2e2;color:#991b1b}
   .icon-btn{background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px;padding:4px}
   .icon-btn:hover{color:#991b1b}
@@ -2586,12 +2590,16 @@ function calcProfit(set, costPerUnit, feePercent){
   const price = num(set.price);
   const shipping = num(set.shipping);
   const cost = num(costPerUnit) * qty;
-  // 手数料：金額が入力されていればその額を使用、空欄なら手数料率×販売価格で自動計算
-  const hasFixedFee = set.feeAmount!==undefined && set.feeAmount!==null && String(set.feeAmount).trim()!=='';
-  const fee = hasFixedFee ? num(set.feeAmount) : price * num(feePercent)/100;
+  // 手数料：①金額(¥)の上書き → ②率(%)の上書き → ③空欄なら共通の手数料率で自動計算
+  const hasAmt  = set.feeAmount!==undefined && set.feeAmount!==null && String(set.feeAmount).trim()!=='';
+  const hasRate = set.feeRate!==undefined  && set.feeRate!==null  && String(set.feeRate).trim()!=='';
+  let fee, feeKind;
+  if(hasAmt){ fee = num(set.feeAmount); feeKind='amount'; }
+  else if(hasRate){ fee = price * num(set.feeRate)/100; feeKind='rate'; }
+  else { fee = price * num(feePercent)/100; feeKind='auto'; }
   const profit = price - cost - shipping - fee;
   const margin = price>0 ? (profit/price*100) : 0;
-  return {price,cost,shipping,fee,profit,margin,feeFixed:hasFixedFee};
+  return {price,cost,shipping,fee,profit,margin,feeFixed:(hasAmt||hasRate),feeKind};
 }
 
 /* ===== タブ切り替え ===== */
@@ -3967,6 +3975,10 @@ function renderSetRow(mall, set){
       <option value="asin3" ${set.asinTarget==='asin3'?'selected':''}>ASIN③</option>
       <option value="asin4" ${set.asinTarget==='asin4'?'selected':''}>ASIN④</option>
     </select></div>` : '';
+  // 手数料の上書きモードと値（既存データ：feeAmount=金額 / feeRate=率）
+  const _feeMode = (set.feeAmount!==undefined&&set.feeAmount!==null&&set.feeAmount!=='') ? 'amount'
+                 : (set.feeRate!==undefined&&set.feeRate!==null&&set.feeRate!=='') ? 'rate' : 'auto';
+  const _feeVal = _feeMode==='amount' ? set.feeAmount : _feeMode==='rate' ? set.feeRate : '';
   row.innerHTML=`
     <div><label class="field">パターン名</label><input type="text" data-k="label" value="${esc(set.label||'')}" placeholder="単品/2個ｾｯﾄ等"></div>
     ${asinTargetHtml}
@@ -3974,7 +3986,17 @@ function renderSetRow(mall, set){
     <div><label class="field">入数</label><input type="number" data-k="qty" min="1" value="${set.qty||1}"></div>
     <div><label class="field">販売価格(税込)</label><input type="number" data-k="price" min="0" value="${set.price??''}"></div>
     <div><label class="field">出荷送料</label><input type="number" data-k="shipping" min="0" value="${set.shipping||0}"></div>
-    <div><label class="field">手数料</label><input type="number" data-k="feeAmount" min="0" value="${(set.feeAmount!==undefined&&set.feeAmount!==null&&set.feeAmount!=='')?set.feeAmount:''}" placeholder="自動" title="空欄なら手数料率で自動計算されます（今まで通り）。必要なときだけ金額を入れて変更できます"><div class="set-fee-note" data-calc="feeNote"></div></div>
+    <div><label class="field">手数料</label>
+      <div class="fee-override" title="自動＝共通の手数料率／％＝この商品だけの率／¥＝金額を直接指定">
+        <select data-k="feeMode">
+          <option value="auto" ${_feeMode==='auto'?'selected':''}>自動</option>
+          <option value="rate" ${_feeMode==='rate'?'selected':''}>％</option>
+          <option value="amount" ${_feeMode==='amount'?'selected':''}>¥</option>
+        </select>
+        <input type="number" data-k="feeValue" min="0" step="0.1" value="${_feeVal!==''?_feeVal:''}" placeholder="${_feeMode==='auto'?'自動':_feeMode==='rate'?'例10':'例150'}" ${_feeMode==='auto'?'disabled':''}>
+      </div>
+      <div class="set-fee-note" data-calc="feeNote"></div>
+    </div>
     <div><label class="field">利益</label><div class="calc-field" data-calc="profit">¥0</div></div>
     <div><label class="field">粗利率</label><div class="calc-field" data-calc="margin">0.0%</div></div>
     <div><button type="button" class="icon-btn" onclick="this.closest('.set-row').remove();updateSetCalcs('${mall}')">🗑</button></div>`;
@@ -4366,12 +4388,22 @@ function updateSetCalcs(mall){
   document.querySelectorAll('#sets_'+mall+' .set-row').forEach(row=>{
     const costType = row.querySelector('[data-k=costType]').value;
     const cost = getEditingCost(costType);
-    const feeAmtEl = row.querySelector('[data-k=feeAmount]');
+    const feeModeEl = row.querySelector('[data-k=feeMode]');
+    const feeValEl = row.querySelector('[data-k=feeValue]');
+    const feeMode = feeModeEl ? feeModeEl.value : 'auto';
+    const feeValue = feeValEl ? feeValEl.value : '';
+    // 値入力欄の状態を同期（自動時は無効化・空に）
+    if(feeValEl){
+      feeValEl.disabled = (feeMode==='auto');
+      feeValEl.placeholder = feeMode==='auto' ? '自動' : (feeMode==='rate' ? '例10' : '例150');
+      if(feeMode==='auto' && feeValEl.value!=='') feeValEl.value='';
+    }
     const set={
       qty: num(row.querySelector('[data-k=qty]').value)||1,
       price: num(row.querySelector('[data-k=price]').value),
       shipping: num(row.querySelector('[data-k=shipping]').value),
-      feeAmount: feeAmtEl ? feeAmtEl.value : ''
+      feeAmount: feeMode==='amount' ? feeValue : '',
+      feeRate: feeMode==='rate' ? feeValue : ''
     };
     const r = calcProfit(set,cost,fee);
     const pf = row.querySelector('[data-calc=profit]');
@@ -4383,7 +4415,10 @@ function updateSetCalcs(mall){
     // 適用中の手数料を常に表示（今まで通り自動で入っている／手動で変更したが一目で分かる）
     const note = row.querySelector('[data-calc=feeNote]');
     if(note){
-      note.textContent = set.price>0 ? `適用 ¥${fmt(r.fee)}（${r.feeFixed?'手動':'自動'}）` : '';
+      const kindLabel = r.feeKind==='auto' ? '自動'
+                      : r.feeKind==='rate' ? ('率'+(num(feeValue)||0)+'%')
+                      : '金額';
+      note.textContent = set.price>0 ? `適用 ¥${fmt(r.fee)}（${kindLabel}）` : '';
       note.classList.toggle('manual', r.feeFixed);
     }
   });
@@ -4393,14 +4428,16 @@ function collectSets(mall){
   const out=[];
   document.querySelectorAll('#sets_'+mall+' .set-row').forEach(row=>{
     const at = row.querySelector('[data-k=asinTarget]');
-    const feeRaw = (row.querySelector('[data-k=feeAmount]')?.value ?? '').trim();
+    const feeMode = row.querySelector('[data-k=feeMode]')?.value || 'auto';
+    const feeVal = (row.querySelector('[data-k=feeValue]')?.value ?? '').trim();
     out.push({
       label: row.querySelector('[data-k=label]').value,
       costType: row.querySelector('[data-k=costType]').value || 'case',
       qty: num(row.querySelector('[data-k=qty]').value)||1,
       price: num(row.querySelector('[data-k=price]').value),
       shipping: num(row.querySelector('[data-k=shipping]').value),
-      ...(feeRaw!=='' ? {feeAmount: num(feeRaw)} : {}),
+      ...(feeMode==='amount' && feeVal!=='' ? {feeAmount: num(feeVal)} : {}),
+      ...(feeMode==='rate'   && feeVal!=='' ? {feeRate:   num(feeVal)} : {}),
       ...(at ? {asinTarget: at.value || 'main'} : {})
     });
   });
