@@ -2691,8 +2691,10 @@ function amazonCatFee(key, price){
   let fee = price * amazonCatRate(key, price) / 100;
   const min = (c.min===undefined) ? 30 : c.min;
   if(fee < min) fee = min;
-  if(amazonFeeTaxOn()) fee *= 1.1;
-  return Math.round(fee);
+  // Amazonの計算順：税抜手数料を円に丸める → 消費税10%（1円未満切り捨て）を足す（例 ¥5,800×15.4%=893.2→893＋税89＝982）
+  fee = Math.round(fee);
+  if(amazonFeeTaxOn()) fee += Math.floor(fee*0.1);
+  return fee;
 }
 // 料金表を短い文字で（例「〜750円 5% / 〜1,500円 8.4% / 1,500円超 15.4%」）
 function amazonCatDesc(key){
