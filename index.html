@@ -381,6 +381,14 @@
   .set-row .calc-field{background:#eef2ff;padding:7px 10px;border-radius:5px;font-size:12px;font-weight:800;text-align:right;color:#1e40af}
   .set-row .set-fee-note{font-size:10px;font-weight:700;color:#94a3b8;margin-top:3px;white-space:nowrap}
   .set-row .set-fee-note.manual{color:#be185d}
+  .amz-cat-box{margin-top:10px}
+  .amz-cat-box select{width:100%;max-width:520px}
+  .amz-cat-hint{font-size:12px;color:#7c3aed;margin-top:4px;min-height:1em}
+  .amz-cat-badge{display:inline-block;font-size:11px;font-weight:700;color:#7c3aed;background:#f3e8ff;border:1px solid #e9d5ff;border-radius:999px;padding:1px 8px;margin-bottom:4px;white-space:nowrap}
+  .amz-cat-badge small{font-weight:400;color:#a78bfa}
+  .amz-cat-settings{margin-top:14px;padding:12px;border-radius:10px;background:#faf5ff;border:1px solid #e9d5ff}
+  .amz-cat-table table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+  .amz-cat-table th,.amz-cat-table td{border-bottom:1px solid #eee;padding:5px 6px;text-align:left}
   .set-row .fee-override{display:flex;gap:4px;align-items:center}
   .set-row .fee-override select{flex:0 0 auto;width:56px;font-size:12px;padding:6px 4px}
   .set-row .fee-override input{flex:1 1 auto;min-width:0;width:auto;text-align:right;font-weight:700}
@@ -1147,8 +1155,19 @@
           <input type="number" step="0.1" id="feeYahoo" oninput="updateFee('yahoo',this.value)">
         </div>
       </div>
+      <div class="amz-cat-settings">
+        <label style="display:flex;gap:8px;align-items:center;font-weight:700;cursor:pointer">
+          <input type="checkbox" id="amazonFeeTax" onchange="setAmazonFeeTax(this.checked)" style="width:auto">
+          Amazonカテゴリー手数料に消費税10%を含める（公式の料率は税抜。実際の差引額は税込）
+        </label>
+        <p class="help" style="margin:6px 0 8px">商品ごとに「Amazon手数料カテゴリー」を選ぶと、下の料金表どおり売値に応じた率で計算します（未設定の商品は上の共通率）。「🛒 カート価格更新」を押すと、未設定の商品はKeepaのカテゴリーから自動で設定されます。</p>
+        <details>
+          <summary style="cursor:pointer;font-weight:700">📋 Amazon カテゴリー別 販売手数料一覧（公式・税抜）</summary>
+          <div id="amazonCatTable" class="amz-cat-table"></div>
+        </details>
+      </div>
       <div class="help" style="margin-top:14px">
-        参考目安 — Amazon: 食品 8〜10% / 日用品 15% / 家電 8%（別途FBA手数料）<br>
+        参考目安 — Amazon: 上のカテゴリー別手数料を使うのがおすすめ（別途FBA手数料）<br>
         楽天市場: システム利用料・決済手数料含め合計12〜14%程度<br>
         Yahoo!ショッピング: 売上ロイヤリティなし。ストアポイント・キャンペーン・アフィリエイト原資合計で約10%前後
       </div>
@@ -1769,6 +1788,11 @@
               <option value="true">掲載中</option>
             </select>
           </div>
+        </div>
+        <div class="amz-cat-box">
+          <label class="field">🏷 Amazon手数料カテゴリー <span style="font-weight:400;color:var(--muted)">（ペット・ベビー等はここで選ぶと正確に計算）</span></label>
+          <select id="f_amazon_cat" onchange="updateSetCalcs('amazon')"></select>
+          <div class="amz-cat-hint" id="f_amazon_cat_hint"></div>
         </div>
         <div style="height:10px"></div>
         <div id="sets_amazon"></div>
@@ -2599,10 +2623,107 @@ function calcProfit(set, costPerUnit, feePercent){
   let fee, feeKind;
   if(hasAmt){ fee = num(set.feeAmount); feeKind='amount'; }
   else if(hasRate){ fee = price * num(set.feeRate)/100; feeKind='rate'; }
+  else if(feePercent && typeof feePercent==='object' && AMAZON_FEE_CAT_MAP[feePercent.cat]){
+    fee = amazonCatFee(feePercent.cat, price); feeKind='cat';
+  }
   else { fee = price * num(feePercent)/100; feeKind='auto'; }
   const profit = price - cost - shipping - fee;
   const margin = price>0 ? (profit/price*100) : 0;
   return {price,cost,shipping,fee,profit,margin,feeFixed:(hasAmt||hasRate),feeKind};
+}
+
+/* ===== Amazon カテゴリー別 販売手数料（Amazon出品サービス公式の料金表・税抜） =====
+   t=[[上限円, 率%],...] 売値が上限以下の最初の段を全額に適用。
+   split=[境目, 境目までの率, 超えた部分の率] 売値が境目を超えたら部分ごとに計算（服・靴・バッグ等）
+   min=最低販売手数料(円・税抜) 30円、メディア/ゲームは無し */
+const AMZ_INF = Infinity;
+const AMAZON_FEE_CATS = [
+  {key:'pet',        label:'🐾 ペット用品',                  t:[[750,5],[1500,8.4],[AMZ_INF,15.4]]},
+  {key:'baby',       label:'👶 ベビー&マタニティ',            t:[[750,5],[1500,8.4],[AMZ_INF,15.4]]},
+  {key:'food',       label:'🍙 食品&飲料',                    t:[[750,5],[1500,8.4],[AMZ_INF,10.4]]},
+  {key:'beauty',     label:'💄 ビューティ・ヘルス・パーソナルケア（ドラッグストア）', t:[[750,5],[1500,8.4],[AMZ_INF,10.4]]},
+  {key:'home',       label:'🏠 ホーム&キッチン',              t:[[750,5],[AMZ_INF,15.4]]},
+  {key:'garden',     label:'🌱 ガーデニング・園芸用品',       t:[[750,5],[AMZ_INF,15.4]]},
+  {key:'stationery', label:'✏️ 文房具・オフィス用品',         t:[[750,5],[AMZ_INF,15.4]]},
+  {key:'diy',        label:'🔧 DIY・工具',                    t:[[750,5],[AMZ_INF,15.4]]},
+  {key:'industrial', label:'🏭 産業・研究開発用品',           t:[[750,5],[AMZ_INF,15.4]]},
+  {key:'furniture',  label:'🛋 家具・マットレス',             t:[[750,5],[AMZ_INF,15.4]]},
+  {key:'homeapp',    label:'🍳 ホーム&キッチン家電',          t:[[750,5],[AMZ_INF,10.4]]},
+  {key:'sports',     label:'⚽ スポーツ&アウトドア',          t:[[750,5],[AMZ_INF,10.4]]},
+  {key:'toys',       label:'🧸 おもちゃ&ホビー',              t:[[750,5],[AMZ_INF,10.4]]},
+  {key:'car',        label:'🚗 カー&バイク用品・タイヤ',      t:[[750,5],[AMZ_INF,10.4]]},
+  {key:'elecacc',    label:'🔌 家電アクセサリー',             t:[[750,5],[AMZ_INF,10.4]]},
+  {key:'instrument', label:'🎸 楽器・AV制作機器',             t:[[750,5],[AMZ_INF,10.4]]},
+  {key:'electronics',label:'📱 エレクトロニクス',             t:[[750,5],[AMZ_INF,8.4]]},
+  {key:'pc',         label:'💻 パソコン・周辺機器',           t:[[750,5],[AMZ_INF,8.4]]},
+  {key:'smallapp',   label:'🔋 小型家電・大型家電',           t:[[750,5],[AMZ_INF,8.4]]},
+  {key:'console',    label:'🎮 テレビゲーム機本体',           t:[[750,5],[AMZ_INF,8.4]]},
+  {key:'medical',    label:'🩺 業務用医療用品',               t:[[750,5],[1500,8.4],[AMZ_INF,10.4]]},
+  {key:'beer',       label:'🍺 ビール',                       t:[[750,5],[AMZ_INF,6.9]]},
+  {key:'watch',      label:'⌚ 腕時計',                       t:[[750,5],[AMZ_INF,15.4]]},
+  {key:'apparel',    label:'👕 服&ファッション小物',          t:[[750,5],[2500,8.4],[AMZ_INF,12.4]], split:[3000,12.4,8.4]},
+  {key:'shoes',      label:'👟 シューズ・バッグ・旅行かばん', t:[[750,5],[AMZ_INF,12.4]], split:[7500,12.4,6.4]},
+  {key:'eyewear',    label:'👓 アイウェア',                   t:[[750,5],[AMZ_INF,12.4]], split:[3000,12.4,8.4]},
+  {key:'jewelry',    label:'💍 ジュエリー',                   t:[[750,5],[AMZ_INF,10.4]], split:[10000,10.4,6.4]},
+  {key:'media',      label:'📚 本・DVD・ミュージック・PCソフト', t:[[AMZ_INF,15.4]], min:0},
+  {key:'games',      label:'🕹 テレビゲーム&アクセサリ',       t:[[AMZ_INF,15.4]], min:0},
+  {key:'other',      label:'📦 その他のカテゴリー',           t:[[750,5],[AMZ_INF,15.4]]},
+];
+const AMAZON_FEE_CAT_MAP = Object.fromEntries(AMAZON_FEE_CATS.map(c=>[c.key,c]));
+// 販売手数料には消費税10%が別途かかる（公式は税抜表示）。設定で切替・既定ON
+function amazonFeeTaxOn(){ return !(state && state.fees && state.fees.amazonFeeTax===false); }
+// 売値に対して適用される率(%)（部分計算カテゴリは実効率）
+function amazonCatRate(key, price){
+  const c = AMAZON_FEE_CAT_MAP[key]; if(!c) return 0;
+  price = num(price);
+  if(c.split && price>c.split[0]) return price>0 ? (c.split[0]*c.split[1] + (price-c.split[0])*c.split[2]) / price : 0;
+  const tier = c.t.find(([up])=>price<=up) || c.t[c.t.length-1];
+  return tier[1];
+}
+// 手数料額（円）。最低手数料30円（税抜）・消費税込み（設定ON時）
+function amazonCatFee(key, price){
+  const c = AMAZON_FEE_CAT_MAP[key]; price = num(price);
+  if(!c || price<=0) return 0;
+  let fee = price * amazonCatRate(key, price) / 100;
+  const min = (c.min===undefined) ? 30 : c.min;
+  if(fee < min) fee = min;
+  if(amazonFeeTaxOn()) fee *= 1.1;
+  return Math.round(fee);
+}
+// 料金表を短い文字で（例「〜750円 5% / 〜1,500円 8.4% / 1,500円超 15.4%」）
+function amazonCatDesc(key){
+  const c = AMAZON_FEE_CAT_MAP[key]; if(!c) return '';
+  const parts=[]; let prev=0;
+  c.t.forEach(([up,r])=>{
+    if(up===AMZ_INF) parts.push(prev ? `${fmt(prev)}円超 ${r}%` : `${r}%`);
+    else parts.push(`〜${fmt(up)}円 ${r}%`);
+    prev = up;
+  });
+  let d = parts.join(' / ');
+  if(c.split) d += `（${fmt(c.split[0])}円超の部分は ${c.split[2]}%）`;
+  d += (c.min===0) ? '・最低手数料なし' : '・最低30円';
+  return d;
+}
+// 商品×モールで使う手数料の指定（Amazonでカテゴリー設定済みならカテゴリー、他は共通率）
+function mallFeeSpec(p, mall){
+  if(mall==='amazon' && p && AMAZON_FEE_CAT_MAP[p.amazonCategory]) return {cat:p.amazonCategory};
+  return state.fees[mall];
+}
+function amazonCatShort(key){ const c=AMAZON_FEE_CAT_MAP[key]; return c ? c.label.replace(/（.*?）/,'') : ''; }
+// Keepa のルートカテゴリー名 → 手数料カテゴリー（推定）
+function keepaRootToFeeCat(name){
+  const n = String(name||'');
+  const rules = [
+    [/ペット/,'pet'],[/ベビー|マタニティ/,'baby'],[/食品|飲料|お酒/,'food'],
+    [/ドラッグ|ビューティ|ヘルス|コスメ/,'beauty'],[/DIY|工具/,'diy'],[/ガーデン|園芸/,'garden'],
+    [/文房具|オフィス/,'stationery'],[/産業|研究開発/,'industrial'],[/家具/,'furniture'],
+    [/ホーム.*キッチン/,'home'],[/スポーツ|アウトドア/,'sports'],[/おもちゃ|ホビー/,'toys'],
+    [/車|バイク/,'car'],[/パソコン/,'pc'],[/楽器/,'instrument'],[/腕時計/,'watch'],[/ジュエリー/,'jewelry'],
+    [/シューズ|バッグ/,'shoes'],[/服|ファッション/,'apparel'],[/ゲーム/,'games'],
+    [/本|ミュージック|DVD|ビデオ|ソフトウェア/,'media'],[/家電|カメラ/,'electronics'],
+  ];
+  for(const [re,k] of rules){ if(re.test(n)) return k; }
+  return '';
 }
 
 /* ===== タブ切り替え ===== */
@@ -2639,6 +2760,11 @@ function renderSettings(){
   document.getElementById('feeAmazon').value = state.fees.amazon;
   document.getElementById('feeRakuten').value = state.fees.rakuten;
   document.getElementById('feeYahoo').value = state.fees.yahoo;
+  const tx=document.getElementById('amazonFeeTax'); if(tx) tx.checked = amazonFeeTaxOn();
+  const ct=document.getElementById('amazonCatTable');
+  if(ct) ct.innerHTML = '<table><tr><th>カテゴリー</th><th>販売手数料</th><th>登録商品</th></tr>'
+    + AMAZON_FEE_CATS.map(c=>`<tr><td>${esc(c.label)}</td><td>${esc(amazonCatDesc(c.key))}</td><td style="text-align:right">${state.products.filter(p=>p.amazonCategory===c.key).length||''}</td></tr>`).join('')
+    + '</table>';
   const ms=document.getElementById('mySellerInput'); if(ms) ms.value = mySellerIds().join(', ');
 }
 
@@ -2666,6 +2792,11 @@ function cartRank(b){
   let rank=0;
   for(let i=0;i<b.order.length;i++){ if(ids.includes(String(b.order[i]||'').toUpperCase())){ rank=i+1; break; } }
   return {rank, count: b.liveCount || b.order.length};
+}
+function setAmazonFeeTax(on){
+  state.fees.amazonFeeTax = !!on;
+  saveState();
+  renderProducts();
 }
 function updateFee(mall,val){
   state.fees[mall] = num(val);
@@ -3620,7 +3751,7 @@ function renderMallCell(p,mall){
   if(!m || !m.sets || !m.sets.length){
     return `<div class="mall-cell empty"><span class="not-listed-badge">未掲載</span></div>`;
   }
-  const fee = state.fees[mall];
+  const fee = mallFeeSpec(p, mall);
   let url='';
   if(mall==='amazon') url=asinToUrl(p.amazonUrl||p.asin||'');
   if(mall==='rakuten') url=p.rakutenUrl||'';
@@ -3727,6 +3858,9 @@ function renderMallCell(p,mall){
   } else {
     setsHtml = m.sets.map(renderSet).join('<div style="height:4px"></div>');
   }
+  if(mall==='amazon' && AMAZON_FEE_CAT_MAP[p.amazonCategory]){
+    setsHtml = `<div class="amz-cat-badge" title="手数料カテゴリー：${esc(AMAZON_FEE_CAT_MAP[p.amazonCategory].label)}\n${esc(amazonCatDesc(p.amazonCategory))}${p.amazonCategoryAuto?'\n（Keepaから自動判定・編集画面で変更可）':''}">${esc(amazonCatShort(p.amazonCategory))}${p.amazonCategoryAuto?' <small>自動</small>':''}</div>` + setsHtml;
+  }
   let lowestHtml = '';
   if(mall !== 'amazon'){
     const lo = p.lowest?.[mall] || {price:0, date:''};
@@ -3811,7 +3945,7 @@ function updateStats(){
         if(mall==='yahoo')yahooCount++;
         sets.forEach(s=>{
           const cost = activeCost(p, s.costType||'case');
-          const r=calcProfit(s,cost,state.fees[mall]);
+          const r=calcProfit(s,cost,mallFeeSpec(p,mall));
           totalProfit+=r.profit;
           if(r.price>0){totalMargin+=r.margin;marginCount++}
         });
@@ -3871,6 +4005,7 @@ function openProductModal(id){
   updatePreview();
 
   document.getElementById('f_amazon_url').value = p?.amazonUrl || '';
+  fillAmazonCatSelect(p?.amazonCategory || '');
   document.getElementById('f_rakuten_url').value = p?.rakutenUrl || '';
   document.getElementById('f_yahoo_url').value = p?.yahooUrl || '';
   document.getElementById('f_amazon_listed').value = String(!!p?.malls?.amazon?.listed);
@@ -4387,7 +4522,9 @@ function getEditingCost(costType){
 }
 
 function updateSetCalcs(mall){
-  const fee = state.fees[mall];
+  const catEl = document.getElementById('f_amazon_cat');
+  const fee = (mall==='amazon' && catEl && AMAZON_FEE_CAT_MAP[catEl.value]) ? {cat:catEl.value} : state.fees[mall];
+  if(mall==='amazon') updateAmazonCatHint();
   document.querySelectorAll('#sets_'+mall+' .set-row').forEach(row=>{
     const costType = row.querySelector('[data-k=costType]').value;
     const cost = getEditingCost(costType);
@@ -4398,7 +4535,7 @@ function updateSetCalcs(mall){
     // 値入力欄の状態を同期（自動時は無効化・空に）
     if(feeValEl){
       feeValEl.disabled = (feeMode==='auto');
-      feeValEl.placeholder = feeMode==='auto' ? '自動' : (feeMode==='rate' ? '例10' : '例150');
+      feeValEl.placeholder = feeMode==='auto' ? (fee && typeof fee==='object' ? 'ｶﾃｺﾞﾘ' : '自動') : (feeMode==='rate' ? '例10' : '例150');
       if(feeMode==='auto' && feeValEl.value!=='') feeValEl.value='';
     }
     const set={
@@ -4419,12 +4556,29 @@ function updateSetCalcs(mall){
     const note = row.querySelector('[data-calc=feeNote]');
     if(note){
       const kindLabel = r.feeKind==='auto' ? '自動'
+                      : r.feeKind==='cat' ? ((Math.round(amazonCatRate(fee.cat,set.price)*10)/10)+'%'+(amazonFeeTaxOn()?'+税':''))
                       : r.feeKind==='rate' ? ('率'+(num(feeValue)||0)+'%')
                       : '金額';
       note.textContent = set.price>0 ? `適用 ¥${fmt(r.fee)}（${kindLabel}）` : '';
       note.classList.toggle('manual', r.feeFixed);
     }
   });
+}
+
+// 商品モーダルのカテゴリー選択肢
+function fillAmazonCatSelect(val){
+  const el = document.getElementById('f_amazon_cat'); if(!el) return;
+  el.innerHTML = `<option value="">（未設定：共通の手数料率 ${state.fees.amazon}% で計算）</option>`
+    + AMAZON_FEE_CATS.map(c=>`<option value="${c.key}">${esc(c.label)}</option>`).join('');
+  el.value = AMAZON_FEE_CAT_MAP[val] ? val : '';
+  updateAmazonCatHint();
+}
+function updateAmazonCatHint(){
+  const el = document.getElementById('f_amazon_cat'), h = document.getElementById('f_amazon_cat_hint');
+  if(!el || !h) return;
+  h.textContent = AMAZON_FEE_CAT_MAP[el.value]
+    ? ('料金表：'+amazonCatDesc(el.value)+(amazonFeeTaxOn()?'（＋消費税10%）':'（税抜）'))
+    : '';
 }
 
 function collectSets(mall){
@@ -4489,7 +4643,7 @@ function updateSetLive(pid, mall, si, field, val, uid){
   s[field] = num(val);
   // Recalculate profit in real-time
   var cost = activeCost(p, s.costType||'case');
-  var fee = state.fees[mall];
+  var fee = mallFeeSpec(p, mall);
   var r = calcProfit(s, cost, fee);
   var cls = r.profit>=0 ? 'pos' : 'neg';
   var excellent = r.profit>=600;
@@ -4629,6 +4783,7 @@ function saveProduct(){
     memo: document.getElementById('f_memo').value,
     imageUrl: document.getElementById('f_imageUrl').value.trim(),
     amazonUrl: document.getElementById('f_amazon_url').value.trim(),
+    amazonCategory: document.getElementById('f_amazon_cat')?.value || '',
     rakutenUrl: document.getElementById('f_rakuten_url').value.trim(),
     yahooUrl: document.getElementById('f_yahoo_url').value.trim(),
     malls:{
@@ -4649,6 +4804,8 @@ function saveProduct(){
   data.salesEvents = (prev && Array.isArray(prev.salesEvents)) ? prev.salesEvents : [];
   data.buyBox = (prev && prev.buyBox && typeof prev.buyBox==='object') ? prev.buyBox : {};
   data.rakutenLowest = (prev && prev.rakutenLowest) ? prev.rakutenLowest : null;
+  // カテゴリーをKeepa自動判定のまま保存した時だけ「自動」印を残す（手で変えたら外す）
+  data.amazonCategoryAuto = !!(prev && prev.amazonCategoryAuto && prev.amazonCategory===data.amazonCategory && data.amazonCategory);
   data.history = (prev?.history || []).slice();
   const note = document.getElementById('f_historyNote').value.trim();
   const changes = prev ? diffProduct(prev, data) : ['新規追加'];
@@ -5451,7 +5608,7 @@ async function updateBuyBoxLive(){
   const orig = btn?btn.textContent:'';
   if(btn) btn.disabled=true;
   const today=_todayStr();
-  let done=0, ok=0, authFail=false, rateLimited=false;
+  let done=0, ok=0, authFail=false, rateLimited=false, catFilled=0;
 
   try{
     for(let i=0;i<asins.length;i+=20){
@@ -5479,7 +5636,11 @@ async function updateBuyBoxLive(){
             if(Array.isArray(pp.liveOffersOrder) && Array.isArray(pp.offers)){
               order = pp.liveOffersOrder.map(i=>pp.offers[i]).filter(o=>o && o.condition===1).map(o=>String(o.sellerId||'')).filter(Boolean);
             }
+            const rootName = Array.isArray(pp.categoryTree)&&pp.categoryTree[0] ? pp.categoryTree[0].name : '';
+            const autoCat = keepaRootToFeeCat(rootName);
             (asinToProducts.get(A)||[]).forEach(p=>{
+              // 手数料カテゴリー未設定なら Keepa のカテゴリーから自動設定（手で設定済みのものは触らない）
+              if(autoCat && !p.amazonCategory){ p.amazonCategory = autoCat; p.amazonCategoryAuto = true; catFilled++; }
               if(!p.buyBox||typeof p.buyBox!=='object') p.buyBox={};
               if(price!=null){ p.buyBox[A]={price, date:today, seller, amazon:isAmazon, order, liveCount:order.length}; ok++; }
             });
@@ -5504,6 +5665,7 @@ async function updateBuyBoxLive(){
   saveState();
   renderProducts();
   let msg=`カート価格・順位をライブ更新しました（${ok}ASIN / ${asins.length}件中）`;
+  if(catFilled) msg+=`／手数料カテゴリーを${catFilled}件自動設定`;
   if(rateLimited) msg+=' ※一部トークン待ちが発生';
   toast(msg, 'success');
 }
@@ -5564,9 +5726,10 @@ function exportCSV(){
       (p.malls?.[mall]?.sets||[]).forEach(s=>{
         any=true;
         const cost = activeCost(p, s.costType||'case');
-        const fee = state.fees[mall];
+        const fee = mallFeeSpec(p, mall);
         const r = calcProfit(s,cost,fee);
-        rows.push([...baseRow(p),mall,s.label||'',s.costType||'case',s.qty,s.price,s.shipping,fee,Math.round(r.profit),pct(r.margin),p.memo||'']);
+        const feeCol = (typeof fee==='object') ? (amazonCatShort(fee.cat)+' '+Math.round(amazonCatRate(fee.cat,s.price)*10)/10) : fee;
+        rows.push([...baseRow(p),mall,s.label||'',s.costType||'case',s.qty,s.price,s.shipping,feeCol,Math.round(r.profit),pct(r.margin),p.memo||'']);
       });
     });
     if(!any){
