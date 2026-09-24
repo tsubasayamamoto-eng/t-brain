@@ -373,14 +373,17 @@
   .badge.rakuten{background:var(--rakuten);color:#fff}
   .badge.yahoo{background:var(--yahoo);color:#fff}
 
-  .set-row{display:grid;grid-template-columns:120px 90px 70px 110px 100px 100px 100px 34px;gap:6px;align-items:end;margin-bottom:6px;padding:8px;background:#fff;border-radius:6px;border:1px solid var(--border)}
-  .set-row[data-mall="amazon"]{grid-template-columns:110px 80px 90px 70px 110px 90px 90px 90px 34px}
+  .set-row{display:grid;grid-template-columns:118px 82px 54px 88px 76px 128px 82px 74px 30px;gap:6px;align-items:end;margin-bottom:8px;padding:9px;background:#fff;border-radius:8px;border:1px solid var(--border)}
+  .set-row[data-mall="amazon"]{grid-template-columns:104px 68px 76px 50px 86px 74px 128px 80px 72px 30px}
+  /* 数値入力のスピナー矢印を消す（欄を広く使えるように） */
+  .set-row input[type=number]{-moz-appearance:textfield}
+  .set-row input[type=number]::-webkit-outer-spin-button,.set-row input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .set-row .calc-field{background:#eef2ff;padding:7px 10px;border-radius:5px;font-size:12px;font-weight:800;text-align:right;color:#1e40af}
   .set-row .set-fee-note{font-size:10px;font-weight:700;color:#94a3b8;margin-top:3px;white-space:nowrap}
   .set-row .set-fee-note.manual{color:#be185d}
-  .set-row .fee-override{display:flex;gap:2px;align-items:center}
-  .set-row .fee-override select{flex:0 0 auto;width:46px;font-size:11px;padding:6px 2px}
-  .set-row .fee-override input{flex:1 1 auto;min-width:0;width:auto}
+  .set-row .fee-override{display:flex;gap:4px;align-items:center}
+  .set-row .fee-override select{flex:0 0 auto;width:56px;font-size:12px;padding:6px 4px}
+  .set-row .fee-override input{flex:1 1 auto;min-width:0;width:auto;text-align:right;font-weight:700}
   .set-row .fee-override input:disabled{background:#f8fafc;color:#cbd5e1}
   .set-row .calc-field.neg{background:#fee2e2;color:#991b1b}
   .icon-btn{background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px;padding:4px}
