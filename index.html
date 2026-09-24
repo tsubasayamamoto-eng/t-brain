@@ -580,6 +580,10 @@
   #tab-calc .calc-money-input,#tab-calc .calc-fee-input{width:100%;padding:10px 12px;border:2px solid #ffd6ec;border-radius:12px;font-size:14px;font-weight:800;text-align:right;background:#fffdf0;min-width:80px;font-family:inherit;color:#3a2a4e;transition:all .15s}
   #tab-calc .calc-money-input:focus,#tab-calc .calc-fee-input:focus{outline:none;border-color:var(--row-color);background:#fff;box-shadow:0 0 0 4px rgba(255,94,160,0.15)}
   #tab-calc .calc-name-cell{min-width:140px;display:table-cell}
+  #tab-calc .calc-fee-cell{min-width:150px}
+  #tab-calc .calc-cat-select{width:100%;margin-bottom:4px;padding:5px 6px;border:2px solid #e9d5ff;border-radius:10px;font-size:11px;font-weight:700;color:#7c3aed;background:#faf5ff;font-family:inherit}
+  #tab-calc .calc-fee-input:disabled{background:#f3f4f6;color:#9ca3af}
+  #tab-calc .calc-fee-note{font-size:10px;color:#7c3aed;font-weight:700;margin-top:2px;min-height:12px;white-space:nowrap}
   #tab-calc .calc-name-input{width:100%;padding:10px 12px;border:2px solid #ffd6ec;border-radius:12px;font-size:13px;font-weight:700;background:#fffdf0;font-family:inherit;color:#3a2a4e;min-width:130px}
   #tab-calc .calc-name-input:focus{outline:none;border-color:var(--row-color);background:#fff;box-shadow:0 0 0 4px rgba(255,94,160,0.15)}
   #tab-calc .calc-name-input::placeholder{color:#d4b8cc;font-weight:500}
@@ -1261,7 +1265,7 @@
 
       <header class="calc-header">
         <h1>🎀 利益計算ツール 🎀</h1>
-        <div class="calc-formula">販売価格 × 手数料率 − 原価 − 送料 = 利益</div>
+        <div class="calc-formula">販売価格 × 手数料率（またはAmazonジャンル別手数料）− 原価 − 送料 = 利益</div>
       </header>
 
       <div class="calc-platform-tabs">
@@ -1280,7 +1284,7 @@
         <table class="calc-table">
           <thead>
             <tr>
-              <th></th><th>#</th><th>商品名</th><th>販売価格(円)</th><th>手数料率</th><th>原価(円)</th><th>サイズ・重量(貼付)</th><th>送料(円)</th><th>手数料後売上</th><th>想定利益</th><th>利益率</th><th></th>
+              <th></th><th>#</th><th>商品名</th><th>販売価格(円)</th><th>手数料率 / Amazonジャンル</th><th>原価(円)</th><th>サイズ・重量(貼付)</th><th>送料(円)</th><th>手数料後売上</th><th>想定利益</th><th>利益率</th><th></th>
             </tr>
           </thead>
           <tbody id="calcTbody"></tbody>
@@ -6149,12 +6153,29 @@ window.ProfitCalc = (function(){
     return isNaN(n) ? 0 : n;
   };
 
+  // 手数料後売上：ジャンル(Amazonカテゴリー)選択時は公式料金表で、未選択なら 売値×手数料率
+  function catOn(c){ return !!(c.cat && typeof AMAZON_FEE_CAT_MAP!=='undefined' && AMAZON_FEE_CAT_MAP[c.cat]); }
+  function salesOf(c){
+    const price = +c.price||0;
+    if(catOn(c)) return price - amazonCatFee(c.cat, price);
+    return price*(+c.fee||0);
+  }
+  function feeNoteOf(c){
+    if(!catOn(c) || !(+c.price>0)) return '';
+    const r = Math.round(amazonCatRate(c.cat, +c.price)*10)/10;
+    return `手数料 ¥${Math.round(amazonCatFee(c.cat, +c.price)).toLocaleString()}（${r}%${amazonFeeTaxOn()?'+税':''}）`;
+  }
+  function catOptions(sel){
+    const list = (typeof AMAZON_FEE_CATS!=='undefined') ? AMAZON_FEE_CATS : [];
+    return `<option value="">✏️ 率を手入力</option>` + list.map(x=>`<option value="${x.key}"${x.key===sel?' selected':''}>${x.label.replace(/（.*?）/,'')}</option>`).join('');
+  }
+
   function render(){
     if(!tbody) return;
     tbody.innerHTML = '';
     cards.forEach((c,i)=>{
       const color = CARD_COLORS[i % CARD_COLORS.length];
-      const sales = (+c.price||0)*(+c.fee||0);
+      const sales = salesOf(c);
       const profit = sales-(+c.cost||0)-(+c.ship||0);
       const margin = c.price>0 ? (profit/c.price*100) : 0;
       const cls = profit>=0 ? 'calc-positive' : 'calc-negative';
@@ -6165,7 +6186,11 @@ window.ProfitCalc = (function(){
         <td class="calc-num-cell"><span class="calc-num-badge">${i+1}</span></td>
         <td class="calc-name-cell"><input type="text" class="calc-name-input" data-card-id="${c.id}" data-key="name" value="${(c.name||'').replace(/"/g,'&quot;')}" placeholder="商品名を入力♪"></td>
         <td><input type="text" inputmode="numeric" class="calc-money-input" data-card-id="${c.id}" data-key="price" value="${fmt(c.price)}" placeholder="0"></td>
-        <td><input type="text" inputmode="decimal" class="calc-fee-input" data-card-id="${c.id}" data-key="fee" value="${c.fee}" placeholder="0.89"></td>
+        <td class="calc-fee-cell">
+          <select class="calc-cat-select" data-card-id="${c.id}" data-key="cat" title="Amazonのジャンルを選ぶと公式の手数料表で自動計算">${catOptions(c.cat||'')}</select>
+          <input type="text" inputmode="decimal" class="calc-fee-input" data-card-id="${c.id}" data-key="fee" value="${catOn(c)?'':c.fee}" placeholder="${catOn(c)?'ジャンルで自動':'0.89'}" ${catOn(c)?'disabled':''}>
+          <div class="calc-fee-note">${feeNoteOf(c)}</div>
+        </td>
         <td><input type="text" inputmode="numeric" class="calc-money-input" data-card-id="${c.id}" data-key="cost" value="${fmt(c.cost)}" placeholder="0"></td>
         <td class="calc-paste-cell">
           <textarea class="calc-paste-area" data-card-id="${c.id}" data-key="paste" placeholder="例: 20x15x5cm 200g&#10;(ぺたっと貼るだけ♡)">${c.paste||''}</textarea>
@@ -6187,7 +6212,7 @@ window.ProfitCalc = (function(){
     const rows = tbody.querySelectorAll('tr');
     cards.forEach((c,i)=>{
       const tr = rows[i]; if(!tr) return;
-      const sales = (+c.price||0)*(+c.fee||0);
+      const sales = salesOf(c);
       const profit = sales-(+c.cost||0)-(+c.ship||0);
       const margin = c.price>0 ? (profit/c.price*100) : 0;
       const cls = profit>=0 ? 'calc-positive' : 'calc-negative';
@@ -6195,10 +6220,11 @@ window.ProfitCalc = (function(){
       if(cells[0]) cells[0].textContent = yen(sales);
       if(cells[1]){ cells[1].textContent = yen(profit); cells[1].className = `calc-result-cell calc-profit ${cls}`; }
       if(cells[2]){ cells[2].textContent = margin.toFixed(1)+'%'; cells[2].className = `calc-result-cell calc-margin ${cls}`; }
+      const note = tr.querySelector('.calc-fee-note'); if(note) note.textContent = feeNoteOf(c);
     });
   }
 
-  function addCard(){ cards.push({id:nextId++,name:'',price:0,fee:currentFee,cost:0,ship:0,paste:'',pasteStatus:'',pasteStatusCls:''}); render(); saveData(); }
+  function addCard(){ cards.push({id:nextId++,name:'',price:0,fee:currentFee,cat:'',cost:0,ship:0,paste:'',pasteStatus:'',pasteStatusCls:''}); render(); saveData(); }
   function removeCard(id){ cards = cards.filter(c=>c.id!==id); render(); saveData(); }
 
   function saveData(){
@@ -6213,7 +6239,7 @@ window.ProfitCalc = (function(){
       if(!raw) return false;
       const data = JSON.parse(raw);
       if(data.cards && Array.isArray(data.cards)){
-        cards = data.cards.map(c=>({id:c.id,name:c.name||'',price:c.price||0,fee:c.fee||0.89,cost:c.cost||0,ship:c.ship||0,paste:c.paste||'',pasteStatus:c.pasteStatus||'',pasteStatusCls:c.pasteStatusCls||''}));
+        cards = data.cards.map(c=>({id:c.id,name:c.name||'',price:c.price||0,fee:c.fee||0.89,cat:c.cat||'',cost:c.cost||0,ship:c.ship||0,paste:c.paste||'',pasteStatus:c.pasteStatus||'',pasteStatusCls:c.pasteStatusCls||''}));
         nextId = data.nextId || (Math.max(0, ...cards.map(c=>c.id))+1);
         if(data.currentFee) currentFee = data.currentFee;
         return true;
@@ -6335,6 +6361,12 @@ window.ProfitCalc = (function(){
       if(el.classList.contains('calc-money-input')){ c[key]=toNum(el.value); updateResults(); saveData(); }
       else if(el.classList.contains('calc-fee-input')){ const v=parseFloat(el.value); c[key]=isNaN(v)?0:v; updateResults(); saveData(); }
       else if(el.classList.contains('calc-name-input')){ c.name=el.value; saveData(); }
+      else if(el.classList.contains('calc-cat-select')){
+        c.cat = el.value;
+        const fi = tbody.querySelector(`input.calc-fee-input[data-card-id="${id}"]`);
+        if(fi){ fi.disabled = catOn(c); fi.value = catOn(c) ? '' : c.fee; fi.placeholder = catOn(c) ? 'ジャンルで自動' : '0.89'; }
+        updateResults(); saveData();
+      }
       else if(el.tagName==='TEXTAREA' && key==='paste'){ onPaste(id, el.value); }
     });
     tbody.addEventListener('click', e=>{
