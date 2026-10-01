@@ -387,6 +387,7 @@
   .amz-cat-badge{display:inline-block;font-size:11px;font-weight:700;color:#7c3aed;background:#f3e8ff;border:1px solid #e9d5ff;border-radius:999px;padding:1px 8px;margin-bottom:4px;white-space:nowrap}
   .amz-cat-badge small{font-weight:400;color:#a78bfa}
   .amz-cat-settings{margin-top:14px;padding:12px;border-radius:10px;background:#faf5ff;border:1px solid #e9d5ff}
+  .amz-cat-result{margin:0 0 10px;padding:10px;border-radius:8px;background:#fff;border:1px solid #e9d5ff;font-size:12px;line-height:1.7;max-height:320px;overflow:auto}
   .amz-cat-table table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
   .amz-cat-table th,.amz-cat-table td{border-bottom:1px solid #eee;padding:5px 6px;text-align:left}
   .set-row .fee-override{display:flex;gap:4px;align-items:center}
@@ -1165,6 +1166,9 @@
           Amazonカテゴリー手数料に消費税10%を含める（公式の料率は税抜。実際の差引額は税込）
         </label>
         <p class="help" style="margin:6px 0 8px">商品ごとに「Amazon手数料カテゴリー」を選ぶと、下の料金表どおり売値に応じた率で計算します（未設定の商品は上の共通率）。「🛒 カート価格更新」を押すと、未設定の商品はKeepaのカテゴリーから自動で設定されます。</p>
+        <button type="button" id="btnCatBulk" class="btn sm" style="background:linear-gradient(135deg,#a78bfa 0%,#7c3aed 100%);color:#fff;font-weight:800;margin-bottom:8px" onclick="bulkSetAmazonCategories()">🏷 全商品のジャンルを自動設定</button>
+        <span class="help" style="margin-left:6px">Keepaのカテゴリーから一括判定（1件≒1トークン・手で選んだジャンルは変えません）</span>
+        <div id="catBulkResult" class="amz-cat-result" style="display:none"></div>
         <details>
           <summary style="cursor:pointer;font-weight:700">📋 Amazon カテゴリー別 販売手数料一覧（公式・税抜）</summary>
           <div id="amazonCatTable" class="amz-cat-table"></div>
@@ -2716,19 +2720,39 @@ function mallFeeSpec(p, mall){
   return state.fees[mall];
 }
 function amazonCatShort(key){ const c=AMAZON_FEE_CAT_MAP[key]; return c ? c.label.replace(/（.*?）/,'') : ''; }
-// Keepa のルートカテゴリー名 → 手数料カテゴリー（推定）
-function keepaRootToFeeCat(name){
-  const n = String(name||'');
-  const rules = [
-    [/ペット/,'pet'],[/ベビー|マタニティ/,'baby'],[/食品|飲料|お酒/,'food'],
-    [/ドラッグ|ビューティ|ヘルス|コスメ/,'beauty'],[/DIY|工具/,'diy'],[/ガーデン|園芸/,'garden'],
-    [/文房具|オフィス/,'stationery'],[/産業|研究開発/,'industrial'],[/家具/,'furniture'],
-    [/ホーム.*キッチン/,'home'],[/スポーツ|アウトドア/,'sports'],[/おもちゃ|ホビー/,'toys'],
-    [/車|バイク/,'car'],[/パソコン/,'pc'],[/楽器/,'instrument'],[/腕時計/,'watch'],[/ジュエリー/,'jewelry'],
-    [/シューズ|バッグ/,'shoes'],[/服|ファッション/,'apparel'],[/ゲーム/,'games'],
-    [/本|ミュージック|DVD|ビデオ|ソフトウェア/,'media'],[/家電|カメラ/,'electronics'],
-  ];
-  for(const [re,k] of rules){ if(re.test(n)) return k; }
+// Keepa のカテゴリーツリー（ルート→下位の名前配列）→ 手数料カテゴリー（推定）
+function keepaRootToFeeCat(names){
+  const tree = (Array.isArray(names) ? names : [names]).map(x=>String(x||''));
+  const root = tree[0]||'', all = tree.join(' / ');
+  if(/ペット/.test(root)) return 'pet';
+  if(/ベビー|マタニティ/.test(root)) return 'baby';
+  if(/食品|飲料|お酒/.test(root)) return /ビール/.test(all) ? 'beer' : 'food';
+  if(/ドラッグ|ビューティ|ヘルス|コスメ/.test(root)) return 'beauty';
+  if(/DIY|工具|ガーデン/.test(root)) return /ガーデン|園芸/.test(tree.slice(1).join(' ')) ? 'garden' : 'diy';
+  if(/文房具|オフィス/.test(root)) return 'stationery';
+  if(/産業|研究開発/.test(root)) return 'industrial';
+  if(/ホーム.*キッチン/.test(root)) return /家具|マットレス/.test(all) ? 'furniture' : 'home';
+  if(/スポーツ|アウトドア/.test(root)) return 'sports';
+  if(/おもちゃ|ホビー/.test(root)) return 'toys';
+  if(/車|バイク/.test(root)) return 'car';
+  if(/パソコン/.test(root)) return 'pc';
+  if(/楽器/.test(root)) return 'instrument';
+  if(/腕時計/.test(root)) return 'watch';
+  if(/ジュエリー/.test(root)) return 'jewelry';
+  if(/シューズ|バッグ/.test(root)) return 'shoes';
+  if(/服|ファッション/.test(root)) return 'apparel';
+  if(/ゲーム/.test(root)) return /本体/.test(all) ? 'console' : 'games';
+  if(/^本$|洋書|ミュージック|DVD|Blu-ray|ビデオ|ソフト/.test(root)) return 'media';
+  if(/大型家電/.test(root)) return 'smallapp';
+  if(/家電|カメラ/.test(root)) return /キッチン家電/.test(all) ? 'homeapp' : /アクセサリ/.test(all) ? 'elecacc' : /生活家電|美容家電|健康家電|季節家電/.test(all) ? 'smallapp' : 'electronics';
+  return '';
+}
+// 商品の代表ASIN（ASIN① → ②③④ → AmazonURL内のASIN）
+function productMainAsin(p){
+  for(const a of [p.asin,p.asin2,p.asin3,p.asin4,p.amazonUrl]){
+    const m = String(a||'').toUpperCase().match(/B0[A-Z0-9]{8}/);
+    if(m) return m[0];
+  }
   return '';
 }
 
@@ -5592,6 +5616,74 @@ function getKeepaKey(force){
   return key;
 }
 
+// 🏷 全商品のAmazon手数料ジャンルをKeepaのカテゴリーから一括設定（1ASIN=約1トークン・ライブ取得なし）
+// 手で選んだジャンルは上書きしない。自動判定・未設定のものを設定し直す
+let _catUpdating = false;
+async function bulkSetAmazonCategories(){
+  if(_catUpdating) return;
+  const targets = state.products.filter(p=>!(p.amazonCategory && !p.amazonCategoryAuto));
+  const manual = state.products.length - targets.length;
+  const asinMap = new Map(); const noAsin = [];
+  targets.forEach(p=>{ const a=productMainAsin(p); if(!a){ noAsin.push(p); return; } if(!asinMap.has(a)) asinMap.set(a,[]); asinMap.get(a).push(p); });
+  const asins = [...asinMap.keys()];
+  if(!asins.length){ showCatBulkResult({set:0,changed:0,manual,noAsin,unknown:[],failed:0}); return; }
+  if(!confirm(`${asins.length}件のASINのジャンルをKeepaから取得して設定します（約${asins.length}トークン）。\n手で選んだジャンル（${manual}件）はそのままです。続けますか？`)) return;
+  const key = getKeepaKey(false);
+  if(!key){ toast('Keepa APIキーが必要です','error'); return; }
+  _catUpdating = true;
+  const btn = document.getElementById('btnCatBulk'); const orig = btn?btn.textContent:'';
+  if(btn) btn.disabled = true;
+  let set=0, changed=0, failed=0, authFail=false; const unknown=[]; const got=new Set();
+  try{
+    for(let i=0;i<asins.length;i+=100){
+      const batch = asins.slice(i,i+100);
+      if(btn) btn.textContent = `取得中 ${i}/${asins.length}…`;
+      let tries=0, ok=false;
+      while(tries<3 && !ok){
+        tries++;
+        try{
+          const r = await fetch(`https://api.keepa.com/product?key=${encodeURIComponent(key)}&domain=5&asin=${batch.join(',')}`);
+          if(r.status===400||r.status===401){ authFail=true; break; }
+          if(r.status===429){ await new Promise(rs=>setTimeout(rs,20000)); continue; }
+          const data = await r.json();
+          (data.products||[]).forEach(pp=>{
+            got.add(pp.asin);
+            const tree = (pp.categoryTree||[]).map(c=>c.name);
+            const cat = keepaRootToFeeCat(tree);
+            (asinMap.get(pp.asin)||[]).forEach(p=>{
+              if(!cat){ unknown.push({p, tree}); return; }
+              if(p.amazonCategory!==cat) changed++;
+              p.amazonCategory = cat; p.amazonCategoryAuto = true; set++;
+            });
+          });
+          ok = true;
+        }catch(e){ break; }
+      }
+      if(authFail) break;
+      batch.forEach(a=>{ if(!got.has(a)) failed += (asinMap.get(a)||[]).length; });
+    }
+  }finally{
+    _catUpdating = false;
+    if(btn){ btn.disabled=false; btn.textContent = orig || '🏷 全商品のジャンルを自動設定'; }
+  }
+  if(authFail){ try{ localStorage.removeItem('keepa_api_key'); }catch(e){} toast('Keepa APIキーが無効のようです。もう一度設定してください。','error'); return; }
+  saveState();
+  renderProducts();
+  renderSettings();
+  showCatBulkResult({set,changed,manual,noAsin,unknown,failed});
+  toast(`Amazonジャンルを${set}件設定しました（うち手数料が変わる可能性 ${changed}件）`,'success');
+}
+function showCatBulkResult(r){
+  const el = document.getElementById('catBulkResult'); if(!el) return;
+  const counts = {}; state.products.forEach(p=>{ if(AMAZON_FEE_CAT_MAP[p.amazonCategory]) counts[p.amazonCategory]=(counts[p.amazonCategory]||0)+1; });
+  const link = p => `<a href="#" onclick="event.preventDefault();openProductModal('${p.id}')">${esc(p.name||p.productCode||'(無名)')}</a>`;
+  let h = `<div><b>✅ 設定 ${r.set}件</b>（変更 ${r.changed}件）・手動設定のまま ${r.manual}件${r.failed?`・取得失敗 ${r.failed}件`:''}</div>`;
+  h += `<div style="margin-top:4px">${AMAZON_FEE_CATS.filter(c=>counts[c.key]).map(c=>`<span class="amz-cat-badge" style="margin-right:4px">${esc(amazonCatShort(c.key))} ${counts[c.key]}</span>`).join('')}</div>`;
+  if(r.unknown.length) h += `<div style="margin-top:6px"><b>⚠ ジャンルを判定できなかった商品（${r.unknown.length}件）</b>— 編集画面で選んでください<br>${r.unknown.map(u=>`${link(u.p)} <small style="color:#888">(${esc(u.tree.slice(0,2).join(' › ')||'カテゴリー情報なし')})</small>`).join('<br>')}</div>`;
+  if(r.noAsin.length) h += `<div style="margin-top:6px"><b>⚠ ASINが無い商品（${r.noAsin.length}件）</b>— ASIN登録 or 編集画面でジャンルを選んでください<br>${r.noAsin.map(link).join('、')}</div>`;
+  el.innerHTML = h; el.style.display = 'block';
+}
+
 // 🛒 カート価格をKeepaから直接取得（ワンクリック更新）
 let _bbUpdating = false;
 async function updateBuyBoxLive(){
@@ -5642,8 +5734,7 @@ async function updateBuyBoxLive(){
             if(Array.isArray(pp.liveOffersOrder) && Array.isArray(pp.offers)){
               order = pp.liveOffersOrder.map(i=>pp.offers[i]).filter(o=>o && o.condition===1).map(o=>String(o.sellerId||'')).filter(Boolean);
             }
-            const rootName = Array.isArray(pp.categoryTree)&&pp.categoryTree[0] ? pp.categoryTree[0].name : '';
-            const autoCat = keepaRootToFeeCat(rootName);
+            const autoCat = keepaRootToFeeCat((pp.categoryTree||[]).map(c=>c.name));
             (asinToProducts.get(A)||[]).forEach(p=>{
               // 手数料カテゴリー未設定なら Keepa のカテゴリーから自動設定（手で設定済みのものは触らない）
               if(autoCat && !p.amazonCategory){ p.amazonCategory = autoCat; p.amazonCategoryAuto = true; catFilled++; }
