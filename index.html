@@ -2731,16 +2731,19 @@ function keepaRootToFeeCat(names){
   if(/DIY|工具|ガーデン/.test(root)) return /ガーデン|園芸/.test(tree.slice(1).join(' ')) ? 'garden' : 'diy';
   if(/文房具|オフィス/.test(root)) return 'stationery';
   if(/産業|研究開発/.test(root)) return 'industrial';
-  if(/ホーム.*キッチン/.test(root)) return /家具|マットレス/.test(all) ? 'furniture' : 'home';
+  if(/ホーム.*キッチン/.test(root)) return /家具|マットレス/.test(all) ? 'furniture' : /家電/.test(tree.slice(1).join(' ')) ? 'homeapp' : 'home';
   if(/スポーツ|アウトドア/.test(root)) return 'sports';
   if(/おもちゃ|ホビー/.test(root)) return 'toys';
   if(/車|バイク/.test(root)) return 'car';
   if(/パソコン/.test(root)) return 'pc';
   if(/楽器/.test(root)) return 'instrument';
-  if(/腕時計/.test(root)) return 'watch';
-  if(/ジュエリー/.test(root)) return 'jewelry';
-  if(/シューズ|バッグ/.test(root)) return 'shoes';
-  if(/服|ファッション/.test(root)) return 'apparel';
+  if(/服|ファッション|腕時計|ジュエリー|シューズ|バッグ/.test(root)){
+    if(/腕時計/.test(all)) return 'watch';
+    if(/ジュエリー/.test(all)) return 'jewelry';
+    if(/シューズ|靴|バッグ|スーツケース|ランドセル|財布|かばん/.test(all)) return 'shoes';
+    if(/アイウェア|サングラス|メガネ|眼鏡/.test(all)) return 'eyewear';
+    return 'apparel';
+  }
   if(/ゲーム/.test(root)) return /本体/.test(all) ? 'console' : 'games';
   if(/^本$|洋書|ミュージック|DVD|Blu-ray|ビデオ|ソフト/.test(root)) return 'media';
   if(/大型家電/.test(root)) return 'smallapp';
