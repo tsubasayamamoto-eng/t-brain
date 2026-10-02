@@ -262,6 +262,19 @@
   .lightbox-zoom .zoom-level{background:rgba(255,255,255,.9);padding:0 14px;height:44px;border-radius:22px;display:flex;align-items:center;font-weight:800;color:#4b2d52;font-size:13px;min-width:60px;justify-content:center}
   .name-cell .txt{min-width:0;flex:1}
   .name-cell .name{font-weight:700;font-size:13px;color:#0f172a;line-height:1.35;display:block}
+  .ch-checks{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .ch-chk{display:inline-flex;align-items:center;gap:4px;padding:3px 9px 3px 5px;border-radius:999px;border:1.5px solid #e2e8f0;background:#fff;color:#94a3b8;font-size:11px;font-weight:800;cursor:pointer;user-select:none;transition:all .12s}
+  .ch-chk:hover{border-color:#cbd5e1;background:#f8fafc}
+  .ch-chk input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+  .ch-box{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:4px;border:1.5px solid #cbd5e1;background:#fff;font-size:11px;line-height:1;color:#fff}
+  .ch-chk.on .ch-box{border-color:transparent}
+  .ch-chk.ch-amazon.on{background:#fff7ed;border-color:#fdba74;color:#c2410c}
+  .ch-chk.ch-amazon.on .ch-box{background:#f97316}
+  .ch-chk.ch-rakuten.on{background:#fef2f2;border-color:#fca5a5;color:#b91c1c}
+  .ch-chk.ch-rakuten.on .ch-box{background:#dc2626}
+  .ch-chk.ch-yahoo.on{background:#fdf2f8;border-color:#f9a8d4;color:#be185d}
+  .ch-chk.ch-yahoo.on .ch-box{background:#db2777}
+  .ch-chk:focus-within{outline:2px solid #a78bfa;outline-offset:1px}
   .name-cell .supplier{display:block;font-size:10px;color:var(--muted);margin-top:2px}
 
   /* 原価セル内 バラ売り行 */
@@ -3751,6 +3764,7 @@ function renderProducts(){
           </div>
           <div class="txt">
             <span class="name">${esc(p.name)}</span>
+            ${renderChannelChecks(p)}
             ${p.memo?`<button type="button" class="memo-bubble-btn" onclick="event.stopPropagation();openMemoBubble('${p.id}',this)">💬 メモ</button>`:''}
           </div>
         </div>
@@ -3913,6 +3927,31 @@ function renderMallCell(p,mall){
 }
 
 /* ===== インライン編集 ===== */
+// 販路チェック（どのモールで販売中か）。p.malls[mall].listed を切り替える
+const CHANNELS = [{k:'amazon',label:'Amazon',icon:'🅰'},{k:'rakuten',label:'楽天',icon:'🅡'},{k:'yahoo',label:'Yahoo!',icon:'🅨'}];
+function renderChannelChecks(p){
+  return `<div class="ch-checks" onclick="event.stopPropagation()">` + CHANNELS.map(c=>{
+    const on = !!p.malls?.[c.k]?.listed;
+    return `<label class="ch-chk ch-${c.k}${on?' on':''}" title="${c.label}で販売中ならチェック">
+      <input type="checkbox" ${on?'checked':''} onchange="toggleChannel('${p.id}','${c.k}',this.checked,this)">
+      <span class="ch-box">${on?'✓':''}</span><span class="ch-lbl">${c.label}</span></label>`;
+  }).join('') + `</div>`;
+}
+function toggleChannel(id, mall, on, el){
+  const p = state.products.find(x=>x.id===id); if(!p) return;
+  if(!p.malls) p.malls = {};
+  if(!p.malls[mall]) p.malls[mall] = {listed:false, sets:[]};
+  p.malls[mall].listed = !!on;
+  const lab = el && el.closest('.ch-chk');
+  if(lab){ lab.classList.toggle('on', !!on); const b=lab.querySelector('.ch-box'); if(b) b.textContent = on?'✓':''; }
+  const name = (CHANNELS.find(c=>c.k===mall)||{}).label || mall;
+  p.history = p.history || [];
+  p.history.push({at:new Date().toISOString(), note:'', changes:[`${name}を${on?'販売中':'未掲載'}に変更`]});
+  p.updatedAt = new Date().toISOString();
+  saveState();
+  updateStats();
+}
+
 function updateProductField(id,key,val){
   const p = state.products.find(x=>x.id===id);
   if(!p) return;
