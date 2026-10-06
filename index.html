@@ -2638,6 +2638,8 @@ function doOfflineLogin(){
 }
 
 function startApp(){
+  // パスワード管理拡張(Bitwarden等)の入力メニューが隠れたログイン欄の位置に残らないよう、欄のフォーカスと値を外す
+  try{ const pi=document.getElementById('loginPassword'); if(pi){ pi.blur(); pi.value=''; } if(document.activeElement && document.activeElement!==document.body) document.activeElement.blur(); }catch(e){}
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appBody').style.display = '';
   if(_isOnline){
