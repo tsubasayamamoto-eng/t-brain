@@ -2020,14 +2020,28 @@ function loadStateLocal(){
 // ===== API通信（オンライン時） =====
 
 // GET通信（読み込み・認証用）
-async function apiGet(action, pw){
+// GASはときどき遅延・404(Googleドライブのエラーページ)を返すため、自動で再試行する
+async function apiGet(action, pw, opts){
   const usePw = pw || _sessionPw || '';
-  const url = GAS_URL+'?action='+action+'&pw='+encodeURIComponent(usePw);
-  const res = await fetch(url, {redirect:'follow'});
-  const text = await res.text();
-  try{ return JSON.parse(text); }catch(e){
-    throw new Error('サーバー応答が不正です');
+  const tries = (opts && opts.tries) || (action==='load' ? 4 : 3);
+  const timeoutMs = (opts && opts.timeoutMs) || 40000;
+  let lastErr = null;
+  for(let i=1;i<=tries;i++){
+    if(opts && opts.onTry) try{ opts.onTry(i, tries); }catch(e){}
+    const url = GAS_URL+'?action='+action+'&pw='+encodeURIComponent(usePw)+'&_t='+Date.now();
+    const ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+    const timer = ctl ? setTimeout(()=>ctl.abort(), timeoutMs) : null;
+    try{
+      const res = await fetch(url, {redirect:'follow', cache:'no-store', signal: ctl?ctl.signal:undefined});
+      const text = await res.text();
+      try{ return JSON.parse(text); }catch(e){ lastErr = new Error('サーバー応答が不正です（'+res.status+'）'); }
+    }catch(e){
+      lastErr = new Error(e && e.name==='AbortError' ? 'サーバーの応答が遅すぎます' : ('通信エラー: '+(e&&e.message||e)));
+    }finally{ if(timer) clearTimeout(timer); }
+    console.warn('[apiGet] '+action+' 失敗 '+i+'/'+tries+':', lastErr.message);
+    if(i<tries) await new Promise(r=>setTimeout(r, 1500*i));
   }
+  throw lastErr || new Error('サーバー応答が不正です');
 }
 
 // 保存トークン生成
@@ -2384,8 +2398,8 @@ async function manualSave(){
   }
 }
 
-async function loadStateOnline(){
-  const r = await apiCall('load');
+async function loadStateOnline(onTry){
+  const r = await apiGet('load', null, {onTry});
   if(!r.ok) throw new Error(r.error||'読み込み失敗');
   let products = [];
   const rawP = (r.products==null) ? '' : String(r.products);
@@ -2525,6 +2539,44 @@ async function refreshFromServer(){
   }
 }
 
+// ===== 読込失敗時：画面を止めずに上部に案内を出し、裏で自動再接続 =====
+let _reconnTimer = null, _reconnCount = 0;
+function showLoadFailBanner(err){
+  let b = document.getElementById('loadFailBanner');
+  if(!b){
+    b = document.createElement('div'); b.id = 'loadFailBanner';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;padding:10px 16px;font-size:13px;font-weight:700;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;box-shadow:0 4px 14px rgba(0,0,0,.25)';
+    document.body.appendChild(b);
+  }
+  b.innerHTML = `⚠ サーバーから最新データを読み込めませんでした（保存は止めています・この間の編集は保存されません）。<span id="reconnMsg">自動で再接続しています…</span>
+    <button type="button" onclick="reconnectServer(true)" style="background:#fff;color:#dc2626;border:none;border-radius:8px;padding:5px 12px;font-weight:800;cursor:pointer">🔄 今すぐ再接続</button>`;
+  b.title = '理由: '+(err&&err.message||err||'');
+  _reconnCount = 0;
+  clearTimeout(_reconnTimer);
+  _reconnTimer = setTimeout(()=>reconnectServer(false), 8000);
+}
+async function reconnectServer(manual){
+  clearTimeout(_reconnTimer);
+  const m = document.getElementById('reconnMsg');
+  if(m) m.textContent = '再接続中…';
+  try{
+    const st = await loadStateOnline();
+    const keepSource = state.currentSource;
+    state = st; if(keepSource) state.currentSource = keepSource;
+    _isOnline = true; _serverLoadFailed = false; _lastLoadedCount = state.products.length;
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+    document.getElementById('loadFailBanner')?.remove();
+    const rb = document.getElementById('btnRefresh'); if(rb) rb.style.display = '';
+    switchSource(state.currentSource || 'costco');
+    renderSettings();
+    toast('✅ サーバーと再接続しました（'+state.products.length+'件）','success');
+  }catch(e){
+    _reconnCount++;
+    if(m) m.textContent = _reconnCount<6 ? `再接続できませんでした（${_reconnCount}回目）。しばらくして自動で再試行します…` : '再接続できませんでした。少し時間をおいてページを再読み込みしてください。';
+    if(_reconnCount<6) _reconnTimer = setTimeout(()=>reconnectServer(false), 15000*_reconnCount);
+  }
+}
+
 // ===== パスワード認証 + 起動 =====
 async function doLogin(){
   const pwInput = document.getElementById('loginPassword');
@@ -2548,7 +2600,7 @@ async function doLogin(){
     errEl.textContent = 'データ読み込み中...';
     let _loadedOk = false;
     try{
-      state = await loadStateOnline();
+      state = await loadStateOnline((i,n)=>{ errEl.textContent = i===1 ? 'データ読み込み中...' : `データ読み込み中...（再試行 ${i}/${n}）`; });
       _loadedOk = true;
       _lastLoadedCount = state.products.length;
     }catch(loadErr){
@@ -2557,7 +2609,7 @@ async function doLogin(){
       // サーバーのデータを守るため、読み込めなかった時は保存を止める（閲覧のみ）
       _isOnline = false;
       _serverLoadFailed = true;
-      setTimeout(()=>alert('⚠ サーバーからデータを読み込めませんでした。\n\nサーバーのデータを守るため、この画面からの保存は止めています（編集しても保存されません）。\n時間をおいてページを再読み込みしてください。\n\n理由: '+(loadErr&&loadErr.message||loadErr)), 300);
+      setTimeout(()=>showLoadFailBanner(loadErr), 300);
     }
     // 読み込みに成功した時だけローカルの控えを更新（失敗時に良い控えを空で上書きしない）
     if(_loadedOk){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){} }
@@ -2572,9 +2624,10 @@ async function doLogin(){
     _sessionPw = pw;
     saveSession(pw); // 接続不可でもログイン扱い → 2時間記憶
     _isOnline = false;
+    _serverLoadFailed = true;
     state = loadStateLocal();
     startApp();
-    toast('サーバーに接続できません。ローカル保存モードで起動しました。','error');
+    showLoadFailBanner(e);
   }
 }
 
