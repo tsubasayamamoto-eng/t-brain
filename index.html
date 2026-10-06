@@ -1918,6 +1918,8 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbwSBxsnHkT9J_6_AN1Xuj9t
 
 let _sessionPw = '';
 let _isOnline = false;
+let _lastLoadedCount = -1;      // サーバーから最後に読み込めた商品数（空データでの上書き防止用）
+let _serverLoadFailed = false;
 let state = {products:[], fees:{...DEFAULT_FEES}, currentSource:'costco'};
 let editingProductId = null;
 
@@ -2311,7 +2313,14 @@ async function _getServerCount(){
 }
 
 // ===== 手動保存ボタン =====
+function _saveBlockedReason(){
+  const n = state.products.length;
+  if(_serverLoadFailed) return 'サーバーから読み込めなかったため、保存を止めています。ページを再読み込みしてください。';
+  if(_lastLoadedCount>0 && n===0) return '商品が0件のため保存を中止しました（サーバーのデータは守られています）。';
+  return '';
+}
 async function manualSave(){
+  const _blk = _saveBlockedReason(); if(_blk){ alert('⚠ '+_blk); return; }
   if(!_isOnline){ alert('オフラインモードのため、サーバーに保存できません'); return; }
   const si = document.getElementById('saveIndicator');
   si.textContent = '💾 保存中...';
@@ -2379,8 +2388,9 @@ async function loadStateOnline(){
   const r = await apiCall('load');
   if(!r.ok) throw new Error(r.error||'読み込み失敗');
   let products = [];
-  try{ products = JSON.parse(r.products); }catch(e){}
-  if(!Array.isArray(products)) products = [];
+  const rawP = (r.products==null) ? '' : String(r.products);
+  try{ products = rawP ? JSON.parse(rawP) : []; }catch(e){ throw new Error('商品データの解析に失敗（'+rawP.length+'文字）'); }
+  if(!Array.isArray(products)) throw new Error('商品データの形式が不正');
   products = migrateProducts(products);
   let fees = {...DEFAULT_FEES};
   let suppliers = [];
@@ -2419,6 +2429,13 @@ function saveState(flush){
 }
 
 async function _doSaveNow(){
+  // 空データ・大幅減でサーバーを上書きしない安全装置
+  const n = state.products.length;
+  if(_serverLoadFailed){ updateSaveIndicator('error','読込失敗のため保存停止中'); return; }
+  if(_lastLoadedCount>0 && n===0){ updateSaveIndicator('error','商品0件のため保存を中止'); toast('⚠ 商品が0件のため保存を中止しました（サーバーのデータは守られています）','error'); return; }
+  if(_lastLoadedCount>=10 && n < _lastLoadedCount*0.5){
+    if(!confirm(`⚠ 商品数が ${_lastLoadedCount}件 → ${n}件 に大きく減っています。\n本当にこの内容でサーバーに保存しますか？`)){ updateSaveIndicator('error','保存を中止しました'); return; }
+  }
   try{
     updateSaveIndicator('saving');
     const productsStr = JSON.stringify(state.products);
@@ -2464,9 +2481,10 @@ function updateSaveIndicator(status, detail){
 
 // ===== ページを閉じる・タブ切替時に保存 =====
 window.addEventListener('beforeunload', ()=>{
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  // 読込失敗中・0件のときはローカルの控えも上書きしない
+  if(!_saveBlockedReason()){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){} }
   // sendBeaconでサーバーにも送信試行
-  if(_isOnline && _saveDirty && GAS_URL){
+  if(_isOnline && _saveDirty && GAS_URL && !_saveBlockedReason()){
     try{
       const token = _genSaveToken();
       const blob = new Blob([JSON.stringify({
@@ -2497,7 +2515,8 @@ async function refreshFromServer(){
   try{
     toast('サーバーからデータ取得中...','');
     state = await loadStateOnline();
-    saveState(); // ローカルバックアップ
+    _lastLoadedCount = state.products.length; _serverLoadFailed = false;
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){} // ローカルバックアップのみ（サーバーへ送り返さない）
     renderProducts();
     renderSettings();
     toast('最新データに更新しました🔄','success');
@@ -2527,14 +2546,21 @@ async function doLogin(){
     saveSession(pw); // 認証成功 → 2時間記憶
     _isOnline = true;
     errEl.textContent = 'データ読み込み中...';
+    let _loadedOk = false;
     try{
       state = await loadStateOnline();
+      _loadedOk = true;
+      _lastLoadedCount = state.products.length;
     }catch(loadErr){
       console.warn('オンライン読み込み失敗、ローカルから復元:', loadErr);
       state = loadStateLocal();
-      toast('サーバーから読み込めなかったため、ローカルデータを表示中','error');
+      // サーバーのデータを守るため、読み込めなかった時は保存を止める（閲覧のみ）
+      _isOnline = false;
+      _serverLoadFailed = true;
+      setTimeout(()=>alert('⚠ サーバーからデータを読み込めませんでした。\n\nサーバーのデータを守るため、この画面からの保存は止めています（編集しても保存されません）。\n時間をおいてページを再読み込みしてください。\n\n理由: '+(loadErr&&loadErr.message||loadErr)), 300);
     }
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+    // 読み込みに成功した時だけローカルの控えを更新（失敗時に良い控えを空で上書きしない）
+    if(_loadedOk){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){} }
     startApp();
     if(state.products.length > 0){
       toast(state.products.length+'件の商品を読み込みました','success');
