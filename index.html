@@ -29,6 +29,9 @@
     --yahoo:#f472b6;
     --yahoo-bg:#fdf2f8;
     --yahoo-border:#fbcfe8;
+    --qoo10:#7c3aed;
+    --qoo10-bg:#f5f3ff;
+    --qoo10-border:#ddd6fe;
     --cost-bg:#ecfdf5;
     --cost-border:#a7f3d0;
     --shadow:0 4px 12px rgba(244,114,182,.08),0 2px 4px rgba(244,114,182,.05);
@@ -99,7 +102,7 @@
   .panel{background:var(--panel);border:2px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow)}
 
   /* 統計カード */
-  .stat-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+  .stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
   .stat-card{background:var(--panel);border:2px solid var(--border);border-radius:18px;padding:14px 16px;box-shadow:var(--shadow);border-left:5px solid var(--primary);transition:all .25s;position:relative;overflow:hidden}
   .stat-card::after{content:'';position:absolute;top:-50%;right:-50%;width:100px;height:100px;background:radial-gradient(circle,rgba(244,114,182,.1) 0%,transparent 70%);pointer-events:none}
   .stat-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
@@ -140,7 +143,7 @@
   .table-wrap{overflow-x:auto;border:2px solid var(--border);border-radius:20px;background:#fff;box-shadow:var(--shadow-lg)}
   table.main-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;min-width:1400px}
   table.main-table thead th{text-align:center;padding:12px 8px;font-weight:800;border-bottom:2px solid var(--border);color:#3d2d3d;white-space:nowrap;position:sticky;top:0;z-index:5;background:#fdf2f8;letter-spacing:.3px;font-size:13px}
-  table.main-table thead th.col-amazon,table.main-table thead th.col-rakuten,table.main-table thead th.col-yahoo{font-size:17px;font-weight:900;letter-spacing:.5px;padding:14px 8px}
+  table.main-table thead th.col-amazon,table.main-table thead th.col-rakuten,table.main-table thead th.col-yahoo,table.main-table thead th.col-qoo10{font-size:17px;font-weight:900;letter-spacing:.5px;padding:14px 8px}
   table.main-table thead th.col-code{background:#fce7f3;width:110px}
   table.main-table thead th.col-name{background:#fce7f3;text-align:left;min-width:240px}
   table.main-table thead th.col-status{background:#e0f2fe;width:100px}
@@ -162,6 +165,15 @@
   table.main-table td.col-amazon{border-left:2px solid var(--amazon-border);background:#fffbf0}
   table.main-table td.col-rakuten{border-left:2px solid var(--rakuten-border);background:#fff5f5}
   table.main-table td.col-yahoo{border-left:2px solid var(--yahoo-border);background:#fff5f7}
+  table.main-table thead th.col-qoo10{background:var(--qoo10-bg);min-width:220px;border-left:2px solid var(--qoo10-border);color:var(--qoo10)}
+  table.main-table td.col-qoo10{border-left:2px solid var(--qoo10-border);background:#faf8ff}
+  table.main-table tr.row-sale td.col-qoo10{background:#fff0f0}
+  .mall-section.qoo10{border-color:var(--qoo10-border);background:var(--qoo10-bg)}
+  .badge.qoo10{background:var(--qoo10);color:#fff}
+  .legend-swatch.qoo10{background:var(--qoo10-bg);border-color:var(--qoo10-border)}
+  .stat-card.qoo10 .val{color:var(--qoo10)}
+  .ch-chk.ch-qoo10.on{background:#f5f3ff;border-color:#c4b5fd;color:#6d28d9}
+  .ch-chk.ch-qoo10.on .ch-box{background:#7c3aed}
   table.main-table tr.row-sale td.col-amazon,table.main-table tr.row-sale td.col-rakuten,table.main-table tr.row-sale td.col-yahoo{background:#fff0f0}
 
   /* 非表示商品 */
@@ -1077,6 +1089,7 @@
       <div class="legend-item"><span class="legend-swatch amazon"></span>Amazon</div>
       <div class="legend-item"><span class="legend-swatch rakuten"></span>楽天市場</div>
       <div class="legend-item"><span class="legend-swatch yahoo"></span>Yahoo!</div>
+      <div class="legend-item"><span class="legend-swatch qoo10"></span>Qoo10</div>
       <div class="legend-item sale-only"><span class="legend-swatch sale"></span>セール中行</div>
       <div class="legend-char">
         <span class="kawaii"><svg width="26" height="26"><use href="#char-kitty"/></svg></span>
@@ -1121,6 +1134,7 @@
         <option value="amazon">Amazon掲載中のみ</option>
         <option value="rakuten">楽天掲載中のみ</option>
         <option value="yahoo">Yahoo掲載中のみ</option>
+        <option value="qoo10">Qoo10掲載中のみ</option>
       </select>
       <label class="show-hidden-toggle" title="非表示にした商品も一覧に表示します">
         <input type="checkbox" id="showHidden" onchange="renderProducts()">
@@ -1140,12 +1154,11 @@
             <th class="col-code">相乗り番号 / 商品コード</th>
             <th class="col-name">品名</th>
             <th class="col-status">状況</th>
-            <th class="col-sales">📦 販売実績<span class="sub">今週 / 今月 / 累計</span></th>
-            <th class="col-stock">📦 在庫<span class="sub">クリックで仕入入力</span></th>
             <th class="col-cost">原価（ケース / バラ）<span class="sub sale-only">赤＝セール中</span></th>
             <th class="col-amazon">🅰 Amazon</th>
             <th class="col-rakuten">🅡 楽天市場</th>
             <th class="col-yahoo">🅨 Yahoo!</th>
+            <th class="col-qoo10">Ⓠ Qoo10</th>
             <th class="col-actions"></th>
           </tr>
         </thead>
@@ -1171,6 +1184,10 @@
         <div>
           <label class="field"><span class="badge yahoo">Yahoo!</span> 手数料率 (%)</label>
           <input type="number" step="0.1" id="feeYahoo" oninput="updateFee('yahoo',this.value)">
+        </div>
+        <div>
+          <label class="field"><span class="badge qoo10">Qoo10</span> 手数料率 (%)</label>
+          <input type="number" step="0.1" id="feeQoo10" oninput="updateFee('qoo10',this.value)">
         </div>
       </div>
       <div class="amz-cat-settings">
@@ -1859,6 +1876,26 @@
         <div id="sets_yahoo"></div>
         <button type="button" class="add-set-btn" onclick="addSet('yahoo')">＋ Yahoo販売パターンを追加</button>
       </div>
+
+      <div class="mall-section qoo10">
+        <legend><span class="badge qoo10">Qoo10</span></legend>
+        <div class="grid cols-2">
+          <div>
+            <label class="field">Qoo10商品URL</label>
+            <input type="url" id="f_qoo10_url" placeholder="https://www.qoo10.jp/g/...">
+          </div>
+          <div>
+            <label class="field">Qoo10の掲載状況</label>
+            <select id="f_qoo10_listed">
+              <option value="false">未掲載</option>
+              <option value="true">掲載中</option>
+            </select>
+          </div>
+        </div>
+        <div style="height:10px"></div>
+        <div id="sets_qoo10"></div>
+        <button type="button" class="add-set-btn" onclick="addSet('qoo10')">＋ Qoo10販売パターンを追加</button>
+      </div>
     </div>
     <div class="footer">
       <button type="button" class="btn danger" id="deleteBtn" onclick="deleteCurrent()" style="display:none">この商品を削除</button>
@@ -1879,7 +1916,7 @@
    ============================================================= */
 
 const STORAGE_KEY = 'productResearchDB_v3';
-const DEFAULT_FEES = {amazon:10, rakuten:10, yahoo:10};
+const DEFAULT_FEES = {amazon:10, rakuten:10, yahoo:10, qoo10:10};
 
 // ★★ パスワードを無くす設定 ★★
 // 下の '' の中（クォートの間）に玄愛堂のログインパスワードを貼り付けると、
@@ -2887,6 +2924,8 @@ function renderSettings(){
   document.getElementById('feeAmazon').value = state.fees.amazon;
   document.getElementById('feeRakuten').value = state.fees.rakuten;
   document.getElementById('feeYahoo').value = state.fees.yahoo;
+  if(state.fees.qoo10===undefined) state.fees.qoo10 = DEFAULT_FEES.qoo10;
+  const fq=document.getElementById('feeQoo10'); if(fq) fq.value = state.fees.qoo10;
   const tx=document.getElementById('amazonFeeTax'); if(tx) tx.checked = amazonFeeTaxOn();
   const ct=document.getElementById('amazonCatTable');
   if(ct) ct.innerHTML = '<table><tr><th>カテゴリー</th><th>販売手数料</th><th>登録商品</th></tr>'
@@ -3858,12 +3897,11 @@ function renderProducts(){
           <option ${p.status==='売り切れ'?'selected':''}>売り切れ</option>
         </select>
       </td>
-      <td class="col-sales">${renderSalesCell(p)}</td>
-      <td class="col-stock">${renderStockCell(p)}</td>
       <td class="col-cost">${costCellHTML}</td>
       <td class="col-amazon">${renderMallCell(p,'amazon')}</td>
       <td class="col-rakuten">${renderMallCell(p,'rakuten')}</td>
       <td class="col-yahoo">${renderMallCell(p,'yahoo')}</td>
+      <td class="col-qoo10">${renderMallCell(p,'qoo10')}</td>
       <td>
         <button class="edit-btn" onclick="openProductModal('${p.id}')">✏️ 編集</button>
         <button class="hide-btn ${isHidden?'is-hidden':''}" onclick="event.stopPropagation();toggleHideProduct('${p.id}')" title="${isHidden?'表示に戻す':'この商品を非表示にする'}">${isHidden?'👁 表示':'🙈 非表示'}</button>
@@ -3884,6 +3922,7 @@ function renderMallCell(p,mall){
   if(mall==='amazon') url=asinToUrl(p.amazonUrl||p.asin||'');
   if(mall==='rakuten') url=p.rakutenUrl||'';
   if(mall==='yahoo') url=p.yahooUrl||'';
+  if(mall==='qoo10') url=p.qoo10Url||'';
   const linkHtml = url?`<a class="mall-link" href="${esc(url)}" target="_blank" rel="noopener" title="モールのページを開く" onclick="event.stopPropagation()">🔗</a>`:'';
   const renderSet = s => {
     const cost = activeCost(p, s.costType||'case');
@@ -4009,7 +4048,7 @@ function renderMallCell(p,mall){
 
 /* ===== インライン編集 ===== */
 // 販路チェック（どのモールで販売中か）。p.malls[mall].listed を切り替える
-const CHANNELS = [{k:'amazon',label:'Amazon',icon:'🅰'},{k:'rakuten',label:'楽天',icon:'🅡'},{k:'yahoo',label:'Yahoo!',icon:'🅨'}];
+const CHANNELS = [{k:'amazon',label:'Amazon',icon:'🅰'},{k:'rakuten',label:'楽天',icon:'🅡'},{k:'yahoo',label:'Yahoo!',icon:'🅨'},{k:'qoo10',label:'Qoo10',icon:'Ⓠ'}];
 function renderChannelChecks(p){
   return `<div class="ch-checks" onclick="event.stopPropagation()">` + CHANNELS.map(c=>{
     const on = !!p.malls?.[c.k]?.listed;
@@ -4087,12 +4126,13 @@ function updateStats(){
   const total = visible.length;
   const selling = visible.filter(p=>p.status==='販売中').length;
   const saleNow = visible.filter(p=>p.saleActive).length;
-  let amazonCount=0,rakutenCount=0,yahooCount=0;
+  let amazonCount=0,rakutenCount=0,yahooCount=0,qoo10Count=0;
   let totalProfit=0,totalMargin=0,marginCount=0;
   visible.forEach(p=>{
-    ['amazon','rakuten','yahoo'].forEach(mall=>{
+    ['amazon','rakuten','yahoo','qoo10'].forEach(mall=>{
       const sets = p.malls?.[mall]?.sets || [];
       if(sets.length){
+        if(mall==='qoo10')qoo10Count++;
         if(mall==='amazon')amazonCount++;
         if(mall==='rakuten')rakutenCount++;
         if(mall==='yahoo')yahooCount++;
@@ -4112,7 +4152,8 @@ function updateStats(){
     <div class="stat-card sale sale-only"><div class="label">🔴 セール中の商品</div><div class="val">${saleNow}</div><div class="sub">セール原価で計算中</div>${charSVG('char-bunny',34,36)}</div>
     <div class="stat-card amazon"><div class="label">🅰 Amazon 掲載</div><div class="val">${amazonCount}</div><div class="sub">SKU数</div>${charSVG('char-chick',34,34)}</div>
     <div class="stat-card rakuten"><div class="label">🅡 楽天 掲載</div><div class="val">${rakutenCount}</div><div class="sub">SKU数</div>${charSVG('char-kitty',36,34)}</div>
-    <div class="stat-card yahoo"><div class="label">🅨 Yahoo! 掲載</div><div class="val">${yahooCount}</div><div class="sub">平均粗利 ${pct(avgMargin)}</div>${charSVG('char-cloud',38,28)}</div>`;
+    <div class="stat-card yahoo"><div class="label">🅨 Yahoo! 掲載</div><div class="val">${yahooCount}</div><div class="sub">SKU数</div>${charSVG('char-cloud',38,28)}</div>
+    <div class="stat-card qoo10"><div class="label">Ⓠ Qoo10 掲載</div><div class="val">${qoo10Count}</div><div class="sub">平均粗利 ${pct(avgMargin)}</div>${charSVG('char-chick',34,34)}</div>`;
 }
 
 /* ===== 商品モーダル ===== */
@@ -4161,11 +4202,13 @@ function openProductModal(id){
   fillAmazonCatSelect(p?.amazonCategory || '');
   document.getElementById('f_rakuten_url').value = p?.rakutenUrl || '';
   document.getElementById('f_yahoo_url').value = p?.yahooUrl || '';
+  document.getElementById('f_qoo10_url').value = p?.qoo10Url || '';
+  document.getElementById('f_qoo10_listed').value = String(!!p?.malls?.qoo10?.listed);
   document.getElementById('f_amazon_listed').value = String(!!p?.malls?.amazon?.listed);
   document.getElementById('f_rakuten_listed').value = String(!!p?.malls?.rakuten?.listed);
   document.getElementById('f_yahoo_listed').value = String(!!p?.malls?.yahoo?.listed);
 
-  ['amazon','rakuten','yahoo'].forEach(mall=>{
+  ['amazon','rakuten','yahoo','qoo10'].forEach(mall=>{
     document.getElementById('sets_'+mall).innerHTML='';
     const sets = p?.malls?.[mall]?.sets || [];
     sets.forEach(s=>renderSetRow(mall,s));
@@ -4255,11 +4298,11 @@ function updateSaleMode(){
   document.getElementById('saleToggleRow').classList.toggle('off', !isSale);
   document.getElementById('wrapNormal').classList.toggle('active', !isSale);
   document.getElementById('wrapSale').classList.toggle('active', isSale);
-  ['amazon','rakuten','yahoo'].forEach(updateSetCalcs);
+  ['amazon','rakuten','yahoo','qoo10'].forEach(updateSetCalcs);
 }
 
 function onCostChange(){
-  ['amazon','rakuten','yahoo'].forEach(updateSetCalcs);
+  ['amazon','rakuten','yahoo','qoo10'].forEach(updateSetCalcs);
 }
 
 function addSet(mall){
@@ -4330,7 +4373,7 @@ function diffProduct(a,b){
     saleActive:'セール状態', status:'販売状況',
     name:'品名', memo:'メモ',
     asin:'ASIN', asin2:'ASIN2', asin3:'ASIN3', asin4:'ASIN4', jan:'JAN',
-    amazonUrl:'Amazon URL', rakutenUrl:'楽天 URL', yahooUrl:'Yahoo URL'
+    amazonUrl:'Amazon URL', rakutenUrl:'楽天 URL', yahooUrl:'Yahoo URL', qoo10Url:'Qoo10 URL'
   };
   const out = [];
   for(const k of Object.keys(labels)){
@@ -4338,8 +4381,8 @@ function diffProduct(a,b){
     if(String(va)!==String(vb)) out.push(`${labels[k]}: ${va||'空'} → ${vb||'空'}`);
   }
   // モール別の詳細比較（金額改定をモール名付きで記録）
-  const mallName = {amazon:'Amazon', rakuten:'楽天', yahoo:'Yahoo'};
-  ['amazon','rakuten','yahoo'].forEach(m=>{
+  const mallName = {amazon:'Amazon', rakuten:'楽天', yahoo:'Yahoo', qoo10:'Qoo10'};
+  ['amazon','rakuten','yahoo','qoo10'].forEach(m=>{
     const mn = mallName[m];
     const la = !!a?.malls?.[m]?.listed, lb = !!b?.malls?.[m]?.listed;
     if(la!==lb) out.push(`【${mn}】掲載: ${la?'掲載中':'未掲載'} → ${lb?'掲載中':'未掲載'}`);
@@ -4824,7 +4867,7 @@ function updateSetLive(pid, mall, si, field, val, uid){
   clearTimeout(window._setLiveTimer);
   window._setLiveTimer = setTimeout(function(){
     var label = field==='price' ? '売値' : '送料';
-    var mallName = ({amazon:'Amazon',rakuten:'楽天',yahoo:'Yahoo'})[mall]||mall;
+    var mallName = ({amazon:'Amazon',rakuten:'楽天',yahoo:'Yahoo',qoo10:'Qoo10'})[mall]||mall;
     p.history = p.history || [];
     p.history.push({at:new Date().toISOString(), note:'一覧から編集', changes:['【'+mallName+'】'+label+': ¥'+fmt(oldVal)+' → ¥'+fmt(s[field])]});
     if(p.history.length>50) p.history = p.history.slice(-50);
@@ -4838,7 +4881,7 @@ function updateSetLive(pid, mall, si, field, val, uid){
 function updateLowestInline(id, mall, val){
   const p = state.products.find(x=>x.id===id);
   if(!p) return;
-  if(!p.lowest) p.lowest = {amazon:{price:0,date:''},rakuten:{price:0,date:''},yahoo:{price:0,date:''}};
+  if(!p.lowest) p.lowest = {amazon:{price:0,date:''},rakuten:{price:0,date:''},yahoo:{price:0,date:''},qoo10:{price:0,date:''}};
   const newVal = num(val);
   const oldObj = p.lowest[mall] || {price:0,date:''};
   const today = new Date().toISOString().slice(0,10);
@@ -4851,7 +4894,7 @@ function updateLowestInline(id, mall, val){
   }
   // 履歴
   p.history = p.history || [];
-  const mallLabel = {amazon:'Amazon', rakuten:'楽天', yahoo:'Yahoo'}[mall];
+  const mallLabel = {amazon:'Amazon', rakuten:'楽天', yahoo:'Yahoo', qoo10:'Qoo10'}[mall];
   const oldPrice = oldObj.price || 0;
   p.history.push({at:new Date().toISOString(), note:'一覧から編集', changes:[`【${mallLabel}】最安値: ¥${fmt(oldPrice)} → ¥${fmt(newVal)}`]});
   if(p.history.length>50) p.history = p.history.slice(-50);
@@ -4934,7 +4977,7 @@ function saveProduct(){
       const out = {};
       // Amazonは従来値を維持（編集UIは削除済み）
       out.amazon = prev?.lowest?.amazon || {price:0,date:''};
-      ['rakuten','yahoo'].forEach(m=>{
+      ['rakuten','yahoo','qoo10'].forEach(m=>{
         const el = document.getElementById('f_lowest'+m.charAt(0).toUpperCase()+m.slice(1));
         if(!el){ out[m] = prev?.lowest?.[m] || {price:0,date:''}; return; }
         const newVal = num(el.value);
@@ -4951,10 +4994,12 @@ function saveProduct(){
     amazonCategory: document.getElementById('f_amazon_cat')?.value || '',
     rakutenUrl: document.getElementById('f_rakuten_url').value.trim(),
     yahooUrl: document.getElementById('f_yahoo_url').value.trim(),
+    qoo10Url: document.getElementById('f_qoo10_url').value.trim(),
     malls:{
       amazon:{listed: document.getElementById('f_amazon_listed').value==='true', sets: collectSets('amazon')},
       rakuten:{listed: document.getElementById('f_rakuten_listed').value==='true', sets: collectSets('rakuten')},
-      yahoo:{listed: document.getElementById('f_yahoo_listed').value==='true', sets: collectSets('yahoo')}
+      yahoo:{listed: document.getElementById('f_yahoo_listed').value==='true', sets: collectSets('yahoo')},
+      qoo10:{listed: document.getElementById('f_qoo10_listed').value==='true', sets: collectSets('qoo10')}
     },
     updatedAt: new Date().toISOString()
   };
@@ -5947,14 +5992,15 @@ async function updateRakutenLowest(){
 }
 
 function exportCSV(){
-  const rows = [['商品コード','ASIN','ASIN1_相乗り番号','ASIN2','ASIN2_相乗り番号','ASIN3','ASIN3_相乗り番号','ASIN4','ASIN4_相乗り番号','品名','JAN','状況','通常ケース原価','セールケース原価','ケース入数','通常バラ原価','セールバラ原価','セール中','定価','Amazon_URL','Amazon_掲載','楽天_URL','楽天_掲載','Yahoo_URL','Yahoo_掲載','モール','パターン','原価区分','入数','販売価格','送料','手数料率%','利益','粗利%','メモ']];
+  const rows = [['商品コード','ASIN','ASIN1_相乗り番号','ASIN2','ASIN2_相乗り番号','ASIN3','ASIN3_相乗り番号','ASIN4','ASIN4_相乗り番号','品名','JAN','状況','通常ケース原価','セールケース原価','ケース入数','通常バラ原価','セールバラ原価','セール中','定価','Amazon_URL','Amazon_掲載','楽天_URL','楽天_掲載','Yahoo_URL','Yahoo_掲載','Qoo10_URL','Qoo10_掲載','モール','パターン','原価区分','入数','販売価格','送料','手数料率%','利益','粗利%','メモ']];
   const baseRow = p => [p.code,p.asin||'',p.asinCode1||'',p.asin2||'',p.asinCode2||'',p.asin3||'',p.asinCode3||'',p.asin4||'',p.asinCode4||'',p.name,p.jan||'',p.status,p.costNormal||0,p.costSale||0,p.caseQty||0,p.costNormalBara||0,p.costSaleBara||0,p.saleActive?'TRUE':'FALSE',p.listPrice||'',
     p.amazonUrl||'',p.malls?.amazon?.listed?'TRUE':'FALSE',
     p.rakutenUrl||'',p.malls?.rakuten?.listed?'TRUE':'FALSE',
-    p.yahooUrl||'',p.malls?.yahoo?.listed?'TRUE':'FALSE'];
+    p.yahooUrl||'',p.malls?.yahoo?.listed?'TRUE':'FALSE',
+    p.qoo10Url||'',p.malls?.qoo10?.listed?'TRUE':'FALSE'];
   state.products.forEach(p=>{
     let any=false;
-    ['amazon','rakuten','yahoo'].forEach(mall=>{
+    ['amazon','rakuten','yahoo','qoo10'].forEach(mall=>{
       (p.malls?.[mall]?.sets||[]).forEach(s=>{
         any=true;
         const cost = activeCost(p, s.costType||'case');
