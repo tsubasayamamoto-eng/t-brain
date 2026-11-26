@@ -195,6 +195,9 @@
   .code-cell .jan{display:block;font-size:10px;font-weight:500;color:#a08a9e;margin-top:2px}
   .code-cell .asin{display:inline-block;margin-top:3px;padding:2px 6px;border-radius:3px;background:var(--amazon-bg);color:#b45309;font-size:10px;font-weight:700;border:1px solid var(--amazon-border);font-family:monospace}
   .code-cell .asin-link{display:inline-block;margin-top:3px;padding:2px 6px;border-radius:3px;background:var(--amazon-bg);color:#b45309;font-size:10px;font-weight:700;border:1px solid var(--amazon-border);font-family:monospace;text-decoration:none;transition:all .15s}
+  .code-cell .asin-copy{margin-left:3px;padding:1px 5px;border:1px solid var(--amazon-border);border-radius:3px;background:#fff;font-size:10px;line-height:1.4;cursor:pointer;vertical-align:middle}
+  .code-cell .asin-copy:hover{background:var(--amazon-bg)}
+  .code-cell .asin-copy.done{background:#dcfce7;border-color:#86efac}
   .code-cell .asin-link:hover{background:#fbbf24;color:#78350f;transform:translateY(-1px);box-shadow:0 2px 4px rgba(251,191,36,.3)}
   .name-cell{display:flex;gap:8px;align-items:flex-start}
   .lowest-row{display:flex;align-items:center;gap:4px;margin-top:6px;padding:5px 8px;border-radius:9px;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border:1px solid #fbbf24;color:#92400e;font-size:11px;font-weight:800;flex-wrap:wrap}
@@ -2726,6 +2729,11 @@ window.addEventListener('DOMContentLoaded', ()=>{
   // それ以外 → ログイン画面を表示（デフォルト表示のまま）
 });
 
+function copyAsin(asin,btn){
+  const ok=()=>{ toast('ASINをコピーしました: '+asin,'success'); if(btn){btn.textContent='✓';btn.classList.add('done');setTimeout(()=>{btn.textContent='📋';btn.classList.remove('done')},1200);} };
+  if(navigator.clipboard&&window.isSecureContext){ navigator.clipboard.writeText(asin).then(ok).catch(()=>fallback()); } else fallback();
+  function fallback(){ const t=document.createElement('textarea'); t.value=asin; t.style.position='fixed'; t.style.opacity='0'; document.body.appendChild(t); t.select(); try{document.execCommand('copy');ok();}catch(e){toast('コピーできませんでした','error');} t.remove(); }
+}
 function uid(){return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function num(v){const n=Number(v);return isNaN(n)?0:n}
 function fmt(n){return Math.round(n).toLocaleString('ja-JP')}
@@ -3796,14 +3804,14 @@ function renderProducts(){
     return true;
   });
 
-  // 商品コード順に並べ替え（空は末尾）
+  // 新しい商品が上（商品コードの大きい順。コード未設定＝登録したて は先頭）
   filtered.sort((a,b)=>{
     const pa = (a.productCode||'').trim();
     const pb = (b.productCode||'').trim();
-    if(!pa && !pb) return 0;
-    if(!pa) return 1;
-    if(!pb) return -1;
-    return pa.localeCompare(pb, 'ja', {numeric:true});
+    if(!pa && !pb) return String(b.id||'').localeCompare(String(a.id||''));
+    if(!pa) return -1;
+    if(!pb) return 1;
+    return pb.localeCompare(pa, 'ja', {numeric:true});
   });
 
   document.getElementById('resultCount').textContent = `${filtered.length} / ${visibleProducts.length} 件`;
@@ -3871,10 +3879,10 @@ function renderProducts(){
           ${p.code?`<div class="code-sub"><span class="code-label">相乗</span>${esc(p.code)}</div>`:''}
           ${!p.productCode && !p.code?`<div class="code-main" style="color:#9ca3af">—${isHidden?'<span class="hidden-badge">非表示</span>':''}</div>`:''}
           ${p.jan?`<span class="jan">JAN ${esc(p.jan)}</span>`:''}
-          ${p.asin?`<div><a class="asin-link" href="${esc(asinToUrl(p.asin))}" target="_blank" rel="noopener" title="Amazonページ①を開く" onclick="event.stopPropagation()">🅰① ${esc(p.asin)} ↗</a>${p.asinCode1?`<span style="margin-left:4px;font-size:9px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:6px;font-weight:700">${esc(p.asinCode1)}</span>`:''}${buyBoxBadge(p,p.asin)}</div>`:''}
-          ${p.asin2?`<div><a class="asin-link" href="${esc(asinToUrl(p.asin2))}" target="_blank" rel="noopener" title="Amazonページ②を開く" onclick="event.stopPropagation()">🅰② ${esc(p.asin2)} ↗</a>${p.asinCode2?`<span style="margin-left:4px;font-size:9px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:6px;font-weight:700">${esc(p.asinCode2)}</span>`:''}${buyBoxBadge(p,p.asin2)}</div>`:''}
-          ${p.asin3?`<div><a class="asin-link" href="${esc(asinToUrl(p.asin3))}" target="_blank" rel="noopener" title="Amazonページ③を開く" onclick="event.stopPropagation()">🅰③ ${esc(p.asin3)} ↗</a>${p.asinCode3?`<span style="margin-left:4px;font-size:9px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:6px;font-weight:700">${esc(p.asinCode3)}</span>`:''}${buyBoxBadge(p,p.asin3)}</div>`:''}
-          ${p.asin4?`<div><a class="asin-link" href="${esc(asinToUrl(p.asin4))}" target="_blank" rel="noopener" title="Amazonページ④を開く" onclick="event.stopPropagation()">🅰④ ${esc(p.asin4)} ↗</a>${p.asinCode4?`<span style="margin-left:4px;font-size:9px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:6px;font-weight:700">${esc(p.asinCode4)}</span>`:''}${buyBoxBadge(p,p.asin4)}</div>`:''}
+          ${p.asin?`<div><a class="asin-link" href="${esc(asinToUrl(p.asin))}" target="_blank" rel="noopener" title="Amazonページ①を開く" onclick="event.stopPropagation()">🅰① ${esc(p.asin)} ↗</a><button type="button" class="asin-copy" title="ASINをコピー" onclick="event.stopPropagation();copyAsin('${esc(p.asin)}',this)">📋</button>${p.asinCode1?`<span style="margin-left:4px;font-size:9px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:6px;font-weight:700">${esc(p.asinCode1)}</span>`:''}${buyBoxBadge(p,p.asin)}</div>`:''}
+          ${p.asin2?`<div><a class="asin-link" href="${esc(asinToUrl(p.asin2))}" target="_blank" rel="noopener" title="Amazonページ②を開く" onclick="event.stopPropagation()">🅰② ${esc(p.asin2)} ↗</a><button type="button" class="asin-copy" title="ASINをコピー" onclick="event.stopPropagation();copyAsin('${esc(p.asin2)}',this)">📋</button>${p.asinCode2?`<span style="margin-left:4px;font-size:9px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:6px;font-weight:700">${esc(p.asinCode2)}</span>`:''}${buyBoxBadge(p,p.asin2)}</div>`:''}
+          ${p.asin3?`<div><a class="asin-link" href="${esc(asinToUrl(p.asin3))}" target="_blank" rel="noopener" title="Amazonページ③を開く" onclick="event.stopPropagation()">🅰③ ${esc(p.asin3)} ↗</a><button type="button" class="asin-copy" title="ASINをコピー" onclick="event.stopPropagation();copyAsin('${esc(p.asin3)}',this)">📋</button>${p.asinCode3?`<span style="margin-left:4px;font-size:9px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:6px;font-weight:700">${esc(p.asinCode3)}</span>`:''}${buyBoxBadge(p,p.asin3)}</div>`:''}
+          ${p.asin4?`<div><a class="asin-link" href="${esc(asinToUrl(p.asin4))}" target="_blank" rel="noopener" title="Amazonページ④を開く" onclick="event.stopPropagation()">🅰④ ${esc(p.asin4)} ↗</a><button type="button" class="asin-copy" title="ASINをコピー" onclick="event.stopPropagation();copyAsin('${esc(p.asin4)}',this)">📋</button>${p.asinCode4?`<span style="margin-left:4px;font-size:9px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:6px;font-weight:700">${esc(p.asinCode4)}</span>`:''}${buyBoxBadge(p,p.asin4)}</div>`:''}
         </div>
       </td>
       <td class="col-name">
