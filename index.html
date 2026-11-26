@@ -398,8 +398,8 @@
   .badge.rakuten{background:var(--rakuten);color:#fff}
   .badge.yahoo{background:var(--yahoo);color:#fff}
 
-  .set-row{display:grid;grid-template-columns:118px 82px 54px 88px 76px 128px 82px 74px 30px;gap:6px;align-items:end;margin-bottom:8px;padding:9px;background:#fff;border-radius:8px;border:1px solid var(--border)}
-  .set-row[data-mall="amazon"]{grid-template-columns:104px 68px 76px 50px 86px 74px 128px 80px 72px 30px}
+  .set-row{display:grid;grid-template-columns:84px 82px 54px 88px 76px 128px 82px 74px 30px;gap:6px;align-items:end;margin-bottom:8px;padding:9px;background:#fff;border-radius:8px;border:1px solid var(--border)}
+  .set-row[data-mall="amazon"]{grid-template-columns:80px 68px 76px 50px 86px 74px 128px 80px 72px 30px}
   /* 数値入力のスピナー矢印を消す（欄を広く使えるように） */
   .set-row input[type=number]{-moz-appearance:textfield}
   .set-row input[type=number]::-webkit-outer-spin-button,.set-row input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
@@ -419,6 +419,7 @@
   .set-row .fee-override select{flex:0 0 auto;width:56px;font-size:12px;padding:6px 4px}
   .set-row .fee-override input{flex:1 1 auto;min-width:0;width:auto;text-align:right;font-weight:700}
   .set-row .fee-override input:disabled{background:#f8fafc;color:#cbd5e1}
+  .set-row input.auto-label{color:#64748b;background:#f8fafc}
   .set-row .calc-field.neg{background:#fee2e2;color:#991b1b}
   .icon-btn{background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px;padding:4px}
   .icon-btn:hover{color:#991b1b}
@@ -4309,6 +4310,11 @@ function addSet(mall){
   renderSetRow(mall,{label:'',qty:1,price:'',shipping:0});
 }
 
+function autoSetLabel(qty){
+  qty = Number(qty)||1;
+  return qty<=1 ? '単品' : String(qty);
+}
+
 function renderSetRow(mall, set){
   const wrap = document.getElementById('sets_'+mall);
   const row = document.createElement('div');
@@ -4325,8 +4331,12 @@ function renderSetRow(mall, set){
   const _feeMode = (set.feeAmount!==undefined&&set.feeAmount!==null&&set.feeAmount!=='') ? 'amount'
                  : (set.feeRate!==undefined&&set.feeRate!==null&&set.feeRate!=='') ? 'rate' : 'auto';
   const _feeVal = _feeMode==='amount' ? set.feeAmount : _feeMode==='rate' ? set.feeRate : '';
+  // パターン名：空 or 入数どおりの自動名なら「自動」扱い（入数変更に追従）
+  const _qty0 = Number(set.qty)||1;
+  const _labelAuto = !set.label || set.label===autoSetLabel(_qty0);
+  const _labelVal = _labelAuto ? autoSetLabel(_qty0) : set.label;
   row.innerHTML=`
-    <div><label class="field">パターン名</label><input type="text" data-k="label" value="${esc(set.label||'')}" placeholder="単品/2個ｾｯﾄ等"></div>
+    <div><label class="field">パターン名</label><input type="text" data-k="label" value="${esc(_labelVal)}" data-auto="${_labelAuto?'1':'0'}" placeholder="自動" title="入数から自動で入ります（1＝単品）。書き換えると以後は自動で変わりません。空にすると自動に戻ります"></div>
     ${asinTargetHtml}
     <div><label class="field">原価区分</label><select data-k="costType"><option value="case" ${(!set.costType||set.costType==='case')?'selected':''}>📦ケース</option><option value="bara" ${set.costType==='bara'?'selected':''}>🔹バラ</option></select></div>
     <div><label class="field">入数</label><input type="number" data-k="qty" min="1" value="${set.qty||1}"></div>
@@ -4347,6 +4357,19 @@ function renderSetRow(mall, set){
     <div><label class="field">粗利率</label><div class="calc-field" data-calc="margin">0.0%</div></div>
     <div><button type="button" class="icon-btn" onclick="this.closest('.set-row').remove();updateSetCalcs('${mall}')">🗑</button></div>`;
   wrap.appendChild(row);
+  const _lb = row.querySelector('[data-k=label]'), _qt = row.querySelector('[data-k=qty]');
+  _lb.classList.toggle('auto-label', _lb.dataset.auto==='1');
+  _lb.addEventListener('input',()=>{
+    const auto = _lb.value.trim()==='';
+    _lb.dataset.auto = auto?'1':'0';
+    _lb.classList.toggle('auto-label', auto);
+  });
+  _lb.addEventListener('blur',()=>{
+    if(_lb.dataset.auto==='1'){ _lb.value = autoSetLabel(num(_qt.value)||1); _lb.classList.add('auto-label'); }
+  });
+  _qt.addEventListener('input',()=>{
+    if(_lb.dataset.auto==='1') _lb.value = autoSetLabel(num(_qt.value)||1);
+  });
   row.querySelectorAll('input,select').forEach(inp=>{
     inp.addEventListener('input',()=>updateSetCalcs(mall));
     inp.addEventListener('change',()=>updateSetCalcs(mall));
@@ -4796,7 +4819,7 @@ function collectSets(mall){
     const feeMode = row.querySelector('[data-k=feeMode]')?.value || 'auto';
     const feeVal = (row.querySelector('[data-k=feeValue]')?.value ?? '').trim();
     out.push({
-      label: row.querySelector('[data-k=label]').value,
+      label: (row.querySelector('[data-k=label]').value.trim() || autoSetLabel(num(row.querySelector('[data-k=qty]').value)||1)),
       costType: row.querySelector('[data-k=costType]').value || 'case',
       qty: num(row.querySelector('[data-k=qty]').value)||1,
       price: num(row.querySelector('[data-k=price]').value),
