@@ -3875,8 +3875,8 @@ function renderProducts(){
     return `<tr class="${isSale?'row-sale':''} ${isHidden?'row-hidden':''}">
       <td class="col-code">
         <div class="code-cell">
-          ${p.productCode?`<div class="code-main"><span class="code-label pc">商品</span>${esc(p.productCode)}${isHidden?'<span class="hidden-badge">非表示</span>':''}</div>`:''}
-          ${p.code?`<div class="code-sub"><span class="code-label">相乗</span>${esc(p.code)}</div>`:''}
+          ${p.productCode?`<div class="code-main"><span class="code-label pc">商品</span>${esc(p.productCode)}<button type="button" class="asin-copy" title="商品コードをコピー" onclick="event.stopPropagation();copyAsin('${esc(p.productCode)}',this,'商品コード')">📋</button>${isHidden?'<span class="hidden-badge">非表示</span>':''}</div>`:''}
+          ${p.code?`<div class="code-sub"><span class="code-label">相乗</span>${esc(p.code)}<button type="button" class="asin-copy" title="相乗り番号をコピー" onclick="event.stopPropagation();copyAsin('${esc(p.code)}',this,'相乗り番号')">📋</button></div>`:''}
           ${!p.productCode && !p.code?`<div class="code-main" style="color:#9ca3af">—${isHidden?'<span class="hidden-badge">非表示</span>':''}</div>`:''}
           ${p.jan?`<span class="jan">JAN ${esc(p.jan)}</span><button type="button" class="asin-copy" title="JANをコピー" onclick="event.stopPropagation();copyAsin('${esc(p.jan)}',this,'JAN')">📋</button>`:''}
           ${p.asin?`<div><a class="asin-link" href="${esc(asinToUrl(p.asin))}" target="_blank" rel="noopener" title="Amazonページ①を開く" onclick="event.stopPropagation()">🅰① ${esc(p.asin)} ↗</a><button type="button" class="asin-copy" title="ASINをコピー" onclick="event.stopPropagation();copyAsin('${esc(p.asin)}',this)">📋</button>${p.asinCode1?`<span style="margin-left:4px;font-size:9px;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:6px;font-weight:700">${esc(p.asinCode1)}</span>`:''}${buyBoxBadge(p,p.asin)}</div>`:''}
